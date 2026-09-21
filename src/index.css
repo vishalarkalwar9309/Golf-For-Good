@@ -1,0 +1,117 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-display: "Outfit", "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-headline: "Plus Jakarta Sans", "Outfit", ui-sans-serif, system-ui, sans-serif;
+
+  /* Rich Obsidian Background & Layered Surfaces */
+  --color-background: #08090D;
+  --color-surface: #10121A;
+  --color-surface-low: #0C0E14;
+  --color-surface-container: #141722;
+  --color-surface-container-high: #1C2030;
+  --color-surface-container-highest: #262B3E;
+
+  /* Impact Emerald / Mint (Primary) */
+  --color-primary: #10B981;
+  --color-primary-light: #34D399;
+  --color-primary-dark: #059669;
+  --color-primary-container: rgba(16, 185, 129, 0.12);
+  --color-on-primary: #042F2E;
+
+  /* Reward Gold / Amber (Secondary - Draws & Winnings) */
+  --color-secondary: #F59E0B;
+  --color-secondary-light: #FBBF24;
+  --color-secondary-dark: #D97706;
+  --color-secondary-container: rgba(245, 158, 11, 0.12);
+  --color-on-secondary: #451A03;
+
+  /* Empathy & Heart Accent */
+  --color-accent-coral: #F43F5E;
+  --color-accent-coral-container: rgba(244, 63, 94, 0.12);
+
+  /* Typography Colors */
+  --color-on-surface: #F8FAFC;
+  --color-on-surface-variant: #94A3B8;
+  --color-on-surface-muted: #64748B;
+
+  /* Borders & Outlines */
+  --color-outline: rgba(255, 255, 255, 0.08);
+  --color-outline-strong: rgba(255, 255, 255, 0.16);
+
+  /* Status Tokens */
+  --color-success: #10B981;
+  --color-warning: #F59E0B;
+  --color-error: #EF4444;
+  --color-info: #38BDF8;
+}
+
+@layer base {
+  * {
+    border-color: var(--color-outline);
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-on-surface);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+    letter-spacing: -0.025em;
+    font-weight: 700;
+  }
+
+  /* Accessibility: Respect user motion preferences */
+  @media (prefers-reduced-motion: reduce) {
+    *, ::before, ::after {
+      animation-delay: -1ms !important;
+      animation-duration: 1ms !important;
+      animation-iteration-count: 1 !important;
+      background-attachment: initial !important;
+      scroll-behavior: auto !important;
+      transition-delay: 0s !important;
+      transition-duration: 0s !important;
+    }
+  }
+}
+
+/* Reusable UI Utilities */
+@utility surface-card {
+  background-color: #10121A;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 1.25rem;
+}
+
+@utility surface-elevated {
+  background-color: #141722;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+  border-radius: 1.25rem;
+}
+
+@utility text-gradient-emerald {
+  background: linear-gradient(135deg, #34D399 0%, #10B981 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+@utility text-gradient-gold {
+  background: linear-gradient(135deg, #FDE68A 0%, #F59E0B 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+@utility text-gradient-heading {
+  background: linear-gradient(180deg, #FFFFFF 20%, #94A3B8 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}

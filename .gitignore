@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+
+# Production output
+build/
+dist/
+dist-ssr/
+coverage/
+
+# OS files
+.DS_Store
+Thumbs.db
+*.log
+
+# Deployment & tooling
+.vercel
+
+# Environment variables & secrets
+.env
+.env.local
+.env.*.local
+.env*
+!.env.example
+
+# Temporary and local scratch directories
+tmp/
+*.tmp
