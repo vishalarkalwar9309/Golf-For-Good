@@ -173,8 +173,8 @@ const Navbar: React.FC = () => {
               ) : (
                 <div className="flex flex-col gap-3">
                   <Link to="/signup">
-                    <Button variant="primary" size="md" className="w-full">
-                      Join the Draw
+                    <Button variant="lime" size="md" className="w-full">
+                      Join Golf For Good
                     </Button>
                   </Link>
                   <Link to="/login">

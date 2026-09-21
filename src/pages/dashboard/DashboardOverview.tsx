@@ -331,9 +331,13 @@ const DashboardOverview: React.FC = () => {
               {/* Score List */}
               <div className="space-y-3">
                 {scores.length > 0 ? (
-                  scores.map((score) => (
-                    <div 
+                  scores.map((score, i) => (
+                    <motion.div 
                       key={score.id}
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.2, delay: i * 0.04 }}
+                      whileHover={{ x: 2, transition: { duration: 0.12 } }}
                       className="bg-surface-container border border-white/10 rounded-2xl p-4 flex items-center justify-between hover:bg-surface-container-high transition-colors"
                     >
                       <div className="flex items-center gap-4">
@@ -348,7 +352,7 @@ const DashboardOverview: React.FC = () => {
                       <span className="text-[11px] font-medium text-muted-foreground uppercase">
                         Pts
                       </span>
-                    </div>
+                    </motion.div>
                   ))
                 ) : (
                   <EmptyState 

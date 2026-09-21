@@ -1,15 +1,19 @@
 import React, { useState } from 'react';
+import { motion, useReducedMotion, AnimatePresence } from 'motion/react';
 import { Target, Trophy, Heart, Sparkles, RefreshCw, CheckCircle2, Info, ArrowRight } from 'lucide-react';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
+import { AnimatedNumber } from '../ui/motion/AnimatedNumber';
 import { cn } from '../../lib/utils';
 
 /**
  * Educational Interactive Example demonstrating the Golf For Good cycle:
  * PLAY (Stableford scoring) -> WIN (Matching against monthly draw) -> GIVE BACK (Charity allocation).
- * Explicitly labeled as a non-live educational simulation.
+ * Explicitly labeled as a non-live educational simulation with permanent disclaimer.
  */
 export const InteractiveScoreStory: React.FC = () => {
+  const shouldReduceMotion = useReducedMotion();
+
   // Sample educational scores representing 5 latest rounds
   const [sampleScores, setSampleScores] = useState<number[]>([38, 36, 40, 34, 37]);
   const [charityPercentage, setCharityPercentage] = useState<number>(15);
@@ -41,7 +45,7 @@ export const InteractiveScoreStory: React.FC = () => {
 
   return (
     <div className="surface-editorial p-6 sm:p-10 md:p-12 relative overflow-hidden border border-white/10">
-      {/* Educational Notice Banner */}
+      {/* Permanent Educational Disclaimer Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-white/[0.08] mb-8">
         <div className="flex items-center gap-2.5">
           <Badge variant="lime" size="sm" dot>
@@ -71,29 +75,30 @@ export const InteractiveScoreStory: React.FC = () => {
                   PLAY: Your 5 Latest Stableford Rounds
                 </h3>
               </div>
-              <span className="text-xs text-on-surface-variant">Tap arrows to adjust</span>
+              <span className="text-xs text-on-surface-variant">Tap +/- to adjust points</span>
             </div>
             <p className="text-xs text-on-surface-variant mb-4 leading-relaxed">
               Every round you play is logged as an 18-hole Stableford score (1–45 pts). Your official qualifying entry always uses your 5 most recent rounds.
             </p>
 
-            {/* 5 Score Cards */}
+            {/* 5 Score Cards with Micro-interactions */}
             <div className="grid grid-cols-5 gap-2 sm:gap-3">
               {sampleScores.map((score, i) => (
-                <div 
+                <motion.div 
                   key={i} 
-                  className="bg-[#0A0D14] border border-white/10 hover:border-emerald-500/40 rounded-xl p-2.5 sm:p-3 text-center transition-all group"
+                  whileHover={!shouldReduceMotion ? { y: -3, transition: { duration: 0.15 } } : undefined}
+                  className="bg-[#0A0D14] border border-white/10 hover:border-emerald-500/40 rounded-xl p-2.5 sm:p-3 text-center transition-colors group"
                 >
                   <span className="text-[10px] uppercase font-bold text-on-surface-variant block mb-1">
                     Round {i + 1}
                   </span>
                   <div className="font-display font-black text-xl sm:text-2xl text-white my-1 group-hover:text-emerald-400 transition-colors">
-                    {score}
+                    <AnimatedNumber value={score} />
                   </div>
                   <div className="flex items-center justify-center gap-1 mt-1 pt-1 border-t border-white/[0.06]">
                     <button
                       onClick={() => handleScoreChange(i, -1)}
-                      className="w-5 h-5 rounded bg-white/[0.05] hover:bg-white/10 text-xs text-on-surface-variant flex items-center justify-center transition-colors cursor-pointer"
+                      className="w-5 h-5 rounded bg-white/[0.05] hover:bg-white/15 text-xs text-on-surface-variant hover:text-white flex items-center justify-center transition-colors cursor-pointer active:scale-90"
                       title="Decrease score"
                       aria-label="Decrease score"
                     >
@@ -101,14 +106,14 @@ export const InteractiveScoreStory: React.FC = () => {
                     </button>
                     <button
                       onClick={() => handleScoreChange(i, 1)}
-                      className="w-5 h-5 rounded bg-white/[0.05] hover:bg-white/10 text-xs text-on-surface-variant flex items-center justify-center transition-colors cursor-pointer"
+                      className="w-5 h-5 rounded bg-white/[0.05] hover:bg-white/15 text-xs text-on-surface-variant hover:text-white flex items-center justify-center transition-colors cursor-pointer active:scale-90"
                       title="Increase score"
                       aria-label="Increase score"
                     >
                       +
                     </button>
                   </div>
-                </div>
+                </motion.div>
               ))}
             </div>
 
@@ -118,13 +123,16 @@ export const InteractiveScoreStory: React.FC = () => {
                 Try scenarios:
               </span>
               {presets.map((preset, idx) => (
-                <button
+                <motion.button
                   key={idx}
+                  whileHover={!shouldReduceMotion ? { scale: 1.03 } : undefined}
+                  whileTap={!shouldReduceMotion ? { scale: 0.97 } : undefined}
+                  transition={{ duration: 0.12 }}
                   onClick={() => setSampleScores(preset.scores)}
                   className="text-xs px-2.5 py-1 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-on-surface-variant hover:text-white border border-white/10 transition-colors cursor-pointer"
                 >
                   {preset.label}
-                </button>
+                </motion.button>
               ))}
             </div>
           </div>
@@ -155,19 +163,24 @@ export const InteractiveScoreStory: React.FC = () => {
                   Sample Official Draw Numbers
                 </span>
                 <div className="flex items-center gap-2 sm:gap-3">
-                  {sampleDrawNumbers.map((num, i) => (
-                    <div
-                      key={i}
-                      className={cn(
-                        "w-10 h-10 sm:w-11 sm:h-11 rounded-full flex items-center justify-center font-display font-bold text-sm sm:text-base border transition-all",
-                        sortedScores.includes(num)
-                          ? "bg-amber-400 text-slate-950 border-amber-300 shadow-md shadow-amber-400/20 scale-105"
-                          : "bg-white/[0.04] text-white/70 border-white/10"
-                      )}
-                    >
-                      {num}
-                    </div>
-                  ))}
+                  {sampleDrawNumbers.map((num, i) => {
+                    const isMatched = sortedScores.includes(num);
+                    return (
+                      <motion.div
+                        key={i}
+                        animate={isMatched && !shouldReduceMotion ? { scale: [1, 1.08, 1] } : { scale: 1 }}
+                        transition={{ duration: 0.35 }}
+                        className={cn(
+                          "w-10 h-10 sm:w-11 sm:h-11 rounded-full flex items-center justify-center font-display font-bold text-sm sm:text-base border transition-colors",
+                          isMatched
+                            ? "bg-amber-400 text-slate-950 border-amber-300 shadow-md shadow-amber-400/25"
+                            : "bg-white/[0.04] text-white/70 border-white/10"
+                        )}
+                      >
+                        {num}
+                      </motion.div>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -180,17 +193,19 @@ export const InteractiveScoreStory: React.FC = () => {
                   {sortedScores.map((score, i) => {
                     const isMatched = sampleDrawNumbers.includes(score);
                     return (
-                      <div
+                      <motion.div
                         key={i}
+                        layout={!shouldReduceMotion}
+                        transition={{ duration: 0.25 }}
                         className={cn(
-                          "w-10 h-10 sm:w-11 sm:h-11 rounded-full flex items-center justify-center font-display font-bold text-sm sm:text-base border transition-all",
+                          "w-10 h-10 sm:w-11 sm:h-11 rounded-full flex items-center justify-center font-display font-bold text-sm sm:text-base border transition-colors",
                           isMatched
-                            ? "bg-emerald-400 text-slate-950 border-emerald-300 shadow-md shadow-emerald-400/20 scale-105"
+                            ? "bg-emerald-400 text-slate-950 border-emerald-300 shadow-md shadow-emerald-400/25"
                             : "bg-white/[0.04] text-white/70 border-white/10"
                         )}
                       >
                         {score}
-                      </div>
+                      </motion.div>
                     );
                   })}
                 </div>
@@ -199,7 +214,7 @@ export const InteractiveScoreStory: React.FC = () => {
           </div>
         </div>
 
-        {/* Right Column: GIVE BACK (Charity Impact Slider & Summary) */}
+        {/* Right Column: GIVE BACK (Charity Impact Slider & Dynamic Visualization) */}
         <div className="lg:col-span-5 bg-[#090C12] border border-white/10 rounded-2xl p-6 sm:p-8 flex flex-col justify-between h-full">
           <div>
             <div className="flex items-center gap-2 mb-3">
@@ -221,7 +236,7 @@ export const InteractiveScoreStory: React.FC = () => {
                   Your Selected Charity Allocation
                 </span>
                 <span className="font-display font-black text-xl text-rose-400">
-                  {charityPercentage}%
+                  <AnimatedNumber value={charityPercentage} format={v => `${Math.round(v)}%`} />
                 </span>
               </div>
               <input
@@ -241,6 +256,24 @@ export const InteractiveScoreStory: React.FC = () => {
               </div>
             </div>
 
+            {/* Dynamic Allocation Bar */}
+            <div className="mb-6 space-y-2">
+              <span className="text-[10px] uppercase font-bold text-on-surface-variant block">
+                Relative Subscription Split
+              </span>
+              <div className="w-full h-3 rounded-full bg-white/[0.06] overflow-hidden flex">
+                <motion.div 
+                  style={{ width: `${charityPercentage}%` }}
+                  className="h-full bg-rose-400 rounded-l-full"
+                  transition={{ duration: 0.2 }}
+                />
+                <div 
+                  style={{ width: '50%' }}
+                  className="h-full bg-amber-400/80"
+                />
+              </div>
+            </div>
+
             {/* Distribution Visualizer */}
             <div className="space-y-3 p-4 rounded-xl bg-white/[0.02] border border-white/[0.06]">
               <div className="flex items-center justify-between text-xs">
@@ -249,7 +282,7 @@ export const InteractiveScoreStory: React.FC = () => {
                   Your Chosen Charity
                 </span>
                 <span className="font-display font-bold text-white">
-                  {charityPercentage}% of fee
+                  <AnimatedNumber value={charityPercentage} format={v => `${Math.round(v)}%`} /> of fee
                 </span>
               </div>
               <div className="flex items-center justify-between text-xs pt-2 border-t border-white/[0.06]">
