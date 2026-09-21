@@ -268,7 +268,7 @@ const DashboardOverview: React.FC = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 lg:w-80 shrink-0">
+            <div className="grid grid-cols-2 gap-4 lg:w-96 shrink-0">
               <div className="bg-surface-container-low p-4 rounded-2xl border border-white/5">
                 <span className="text-[10px] uppercase font-semibold text-muted-foreground block mb-1">
                   Total Impact
@@ -286,6 +286,19 @@ const DashboardOverview: React.FC = () => {
                   {isPremium ? (scores.length >= 5 ? 'Eligible' : 'Scores Needed') : 'Membership Required'}
                 </span>
               </div>
+
+              <Link 
+                to="/dashboard/winnings" 
+                className="col-span-2 bg-surface-container-low hover:bg-surface-container-high p-3 rounded-2xl border border-white/5 flex items-center justify-between transition-colors group"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Award className="w-4 h-4 text-secondary" />
+                  <span className="text-xs font-semibold text-foreground group-hover:text-primary transition-colors">
+                    Winnings & Verification
+                  </span>
+                </div>
+                <ArrowRight className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary transition-colors" />
+              </Link>
             </div>
           </div>
         </div>

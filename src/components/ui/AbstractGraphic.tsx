@@ -1,15 +1,15 @@
 import React from 'react';
 
 interface AbstractGraphicProps {
-  variant?: 'hero-mesh' | 'wave-divider' | 'contour-blob' | 'impact-glow' | 'draw-orbit';
+  variant?: 'hero-mesh' | 'wave-divider' | 'contour-blob' | 'impact-glow' | 'draw-orbit' | 'organic-topography' | 'ambient-glow';
   className?: string;
-  glowColor?: 'emerald' | 'gold' | 'coral' | 'neutral';
+  glowColor?: 'emerald' | 'gold' | 'coral' | 'lime' | 'cream' | 'neutral';
 }
 
 /**
- * Haikei-style Abstract Organic Visual Primitives.
+ * Editorial Abstract Organic Visual Primitives for Golf For Good.
  * Provides custom SVG layered contour waves, ambient glow fields, and geometric accents
- * avoiding traditional golf clichés.
+ * strictly avoiding traditional golf clichés ("Feel, not fairway").
  */
 export const AbstractGraphic: React.FC<AbstractGraphicProps> = ({
   variant = 'hero-mesh',
@@ -20,17 +20,27 @@ export const AbstractGraphic: React.FC<AbstractGraphicProps> = ({
     emerald: {
       primary: '#10B981',
       secondary: '#059669',
-      glow: 'rgba(16, 185, 129, 0.15)'
+      glow: 'rgba(16, 185, 129, 0.14)'
+    },
+    lime: {
+      primary: '#CCFF00',
+      secondary: '#6EE7B7',
+      glow: 'rgba(204, 255, 0, 0.12)'
+    },
+    cream: {
+      primary: '#FBF9F5',
+      secondary: '#E2DDD5',
+      glow: 'rgba(251, 249, 245, 0.08)'
     },
     gold: {
       primary: '#F59E0B',
       secondary: '#D97706',
-      glow: 'rgba(245, 158, 11, 0.15)'
+      glow: 'rgba(245, 158, 11, 0.14)'
     },
     coral: {
       primary: '#F43F5E',
       secondary: '#BE123C',
-      glow: 'rgba(244, 63, 94, 0.15)'
+      glow: 'rgba(244, 63, 94, 0.14)'
     },
     neutral: {
       primary: '#334155',
@@ -129,6 +139,37 @@ export const AbstractGraphic: React.FC<AbstractGraphicProps> = ({
           <circle cx="200" cy="200" r="80" stroke="rgba(16, 185, 129, 0.2)" strokeWidth="1.5" />
           <circle cx="200" cy="20" r="4" fill="#F59E0B" className="animate-pulse" />
           <circle cx="70" cy="200" r="3" fill="#10B981" />
+        </svg>
+      </div>
+    );
+  }
+
+  if (variant === 'organic-topography') {
+    return (
+      <div className={`pointer-events-none relative overflow-hidden ${className}`}>
+        <svg
+          viewBox="0 0 800 600"
+          className="w-full h-full opacity-15"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            d="M 50 300 C 180 150, 320 450, 500 280 C 650 140, 720 400, 850 320"
+            stroke={selected.primary}
+            strokeWidth="1.5"
+          />
+          <path
+            d="M 20 380 C 160 220, 350 500, 530 350 C 680 220, 750 480, 880 400"
+            stroke={selected.secondary}
+            strokeWidth="1"
+            strokeDasharray="4 6"
+          />
+          <path
+            d="M 80 220 C 220 80, 290 380, 470 200 C 620 60, 700 320, 820 240"
+            stroke={selected.primary}
+            strokeWidth="1"
+            opacity="0.6"
+          />
         </svg>
       </div>
     );

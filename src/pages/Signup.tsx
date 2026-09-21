@@ -136,7 +136,7 @@ const Signup: React.FC = () => {
               </span>
             </Link>
             <h1 className="text-2xl sm:text-3xl font-display font-bold text-white mb-2">
-              Join the Draw
+              Join Golf For Good
             </h1>
             <p className="text-sm text-on-surface-variant">
               Track your golf scores, compete in monthly draws, and fund causes you care about.

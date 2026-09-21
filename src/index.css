@@ -7,18 +7,37 @@
 
   /* Rich Obsidian Background & Layered Surfaces */
   --color-background: #08090D;
-  --color-surface: #10121A;
-  --color-surface-low: #0C0E14;
-  --color-surface-container: #141722;
-  --color-surface-container-high: #1C2030;
-  --color-surface-container-highest: #262B3E;
+  --color-surface: #0E1118;
+  --color-surface-low: #0A0C11;
+  --color-surface-container: #151923;
+  --color-surface-container-high: #1D2332;
+  --color-surface-container-highest: #283044;
 
-  /* Impact Emerald / Mint (Primary) */
+  /* Impact Mint / Emerald (Primary) */
   --color-primary: #10B981;
   --color-primary-light: #34D399;
   --color-primary-dark: #059669;
   --color-primary-container: rgba(16, 185, 129, 0.12);
   --color-on-primary: #042F2E;
+
+  /* Soft Mint (Subtle organic impact) */
+  --color-mint: #6EE7B7;
+  --color-mint-light: #A7F3D0;
+  --color-mint-dark: #059669;
+  --color-mint-container: rgba(110, 231, 183, 0.12);
+
+  /* Electric Lime (Energetic micro-accents & qualifying highlights) */
+  --color-lime: #CCFF00;
+  --color-lime-light: #E0FF66;
+  --color-lime-dark: #99CC00;
+  --color-lime-container: rgba(204, 255, 0, 0.12);
+  --color-lime-glow: rgba(204, 255, 0, 0.25);
+
+  /* Warm Cream / Off-White (Human warmth & editorial clarity) */
+  --color-cream: #FBF9F5;
+  --color-cream-muted: #E2DDD5;
+  --color-cream-dark: #C9C2B5;
+  --color-cream-container: rgba(251, 249, 245, 0.08);
 
   /* Reward Gold / Amber (Secondary - Draws & Winnings) */
   --color-secondary: #F59E0B;
@@ -83,20 +102,34 @@
 
 /* Reusable UI Utilities */
 @utility surface-card {
-  background-color: #10121A;
+  background-color: #0E1118;
   border: 1px solid rgba(255, 255, 255, 0.07);
   border-radius: 1.25rem;
 }
 
 @utility surface-elevated {
-  background-color: #141722;
+  background-color: #151923;
   border: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
   border-radius: 1.25rem;
 }
 
+@utility surface-editorial {
+  background: linear-gradient(180deg, #131722 0%, #0D1017 100%);
+  border: 1px solid rgba(251, 249, 245, 0.1);
+  box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.6);
+  border-radius: 1.5rem;
+}
+
 @utility text-gradient-emerald {
-  background: linear-gradient(135deg, #34D399 0%, #10B981 100%);
+  background: linear-gradient(135deg, #6EE7B7 0%, #10B981 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+@utility text-gradient-lime {
+  background: linear-gradient(135deg, #CCFF00 0%, #6EE7B7 100%);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -104,6 +137,13 @@
 
 @utility text-gradient-gold {
   background: linear-gradient(135deg, #FDE68A 0%, #F59E0B 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+@utility text-gradient-cream {
+  background: linear-gradient(180deg, #FBF9F5 20%, #C9C2B5 100%);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;

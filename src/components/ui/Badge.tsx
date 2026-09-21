@@ -3,7 +3,7 @@ import { cn } from '../../lib/utils';
 
 interface BadgeProps {
   children: React.ReactNode;
-  variant?: 'emerald' | 'gold' | 'coral' | 'neutral' | 'tier5' | 'tier4' | 'tier3';
+  variant?: 'emerald' | 'gold' | 'coral' | 'lime' | 'cream' | 'neutral' | 'tier5' | 'tier4' | 'tier3';
   size?: 'sm' | 'md';
   className?: string;
   dot?: boolean;
@@ -23,6 +23,8 @@ export const Badge: React.FC<BadgeProps> = ({
 
   const variantStyles = {
     emerald: "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30",
+    lime: "bg-[#CCFF00]/15 text-[#CCFF00] border border-[#CCFF00]/30",
+    cream: "bg-[#FBF9F5]/10 text-[#FBF9F5] border border-[#FBF9F5]/20",
     gold: "bg-amber-500/15 text-amber-300 border border-amber-500/30",
     coral: "bg-rose-500/15 text-rose-300 border border-rose-500/30",
     neutral: "bg-slate-800/60 text-slate-300 border border-slate-700/50",
@@ -33,6 +35,8 @@ export const Badge: React.FC<BadgeProps> = ({
 
   const dotColors = {
     emerald: "bg-emerald-400",
+    lime: "bg-[#CCFF00]",
+    cream: "bg-[#FBF9F5]",
     gold: "bg-amber-400",
     coral: "bg-rose-400",
     neutral: "bg-slate-400",

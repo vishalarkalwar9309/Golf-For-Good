@@ -160,7 +160,7 @@ const Login: React.FC = () => {
             <p className="text-xs text-on-surface-variant">
               Don't have an account yet?{' '}
               <Link to="/signup" className="text-primary font-semibold hover:underline">
-                Join the Draw
+                Join Golf For Good
               </Link>
             </p>
           </div>

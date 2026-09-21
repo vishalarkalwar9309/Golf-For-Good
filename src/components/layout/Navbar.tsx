@@ -112,8 +112,8 @@ const Navbar: React.FC = () => {
                 Log In
               </Link>
               <Link to="/signup">
-                <Button variant="primary" size="sm" icon={<ArrowRight className="w-4 h-4" />}>
-                  Join the Draw
+                <Button variant="lime" size="sm" icon={<ArrowRight className="w-4 h-4 text-[#08090D]" />}>
+                  Join Golf For Good
                 </Button>
               </Link>
             </div>

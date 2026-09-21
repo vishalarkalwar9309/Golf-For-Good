@@ -47,7 +47,7 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({ onNavClick }) => {
           </div>
           <div className="flex flex-col">
             <span className="text-lg font-display font-bold tracking-tight text-white leading-none">
-              Play <span className="text-secondary">Admin</span>
+              Golf <span className="text-secondary">Admin</span>
             </span>
             <div className="mt-1.5">
               <Badge variant="gold" size="sm" dot>

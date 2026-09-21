@@ -31,6 +31,8 @@ const AdminOverview: React.FC = () => {
   const [charityImpact, setCharityImpact] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const [chartData, setChartData] = useState<any[]>([]);
+
   useEffect(() => {
     if (user && profile?.role === 'admin') {
       fetchAdminStats();
@@ -67,7 +69,21 @@ const AdminOverview: React.FC = () => {
         publishedDraws: allDraws?.length || 0
       });
 
-      // 3. Extract Winners
+      // 3. Dynamic Chart Data from real draw history
+      if (allDraws && allDraws.length > 0) {
+        const dynamicPoints = [...allDraws].reverse().map(d => ({
+          name: d.draw_month || 'Draw',
+          prizePool: Number(d.prize_pool || 0),
+          rollover: Number(d.jackpot_rollover_amount || 0)
+        }));
+        setChartData(dynamicPoints);
+      } else {
+        setChartData([
+          { name: 'Current Cycle', prizePool: 0, rollover: 0 }
+        ]);
+      }
+
+      // 4. Extract Winners
       const winnersList: Winner[] = [];
       allDraws?.slice(0, 5).forEach(d => {
         if (d.winners) {
@@ -83,15 +99,6 @@ const AdminOverview: React.FC = () => {
       setLoading(false);
     }
   };
-
-  const chartData = [
-    { name: 'Jan', revenue: 45000, impact: 12000 },
-    { name: 'Feb', revenue: 52000, impact: 15000 },
-    { name: 'Mar', revenue: 48000, impact: 14000 },
-    { name: 'Apr', revenue: 61000, impact: 18000 },
-    { name: 'May', revenue: 55000, impact: 16000 },
-    { name: 'Jun', revenue: 67000, impact: 21000 },
-  ];
 
   if (loading) {
     return (
@@ -163,21 +170,21 @@ const AdminOverview: React.FC = () => {
             <div className="flex items-center justify-between mb-8">
               <div>
                 <h3 className="font-display font-bold text-lg text-foreground">
-                  Platform Growth Trajectory
+                  Draw Cycles & Prize Allocations
                 </h3>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Monthly platform revenue vs. pass-through charity impact.
+                  Published monthly prize pools and carry-forward jackpot rollovers.
                 </p>
               </div>
 
               <div className="flex gap-4 text-xs font-semibold">
                 <div className="flex items-center gap-2">
                   <div className="w-2.5 h-2.5 rounded-full bg-primary" />
-                  <span className="text-foreground">Revenue</span>
+                  <span className="text-foreground">Prize Pool</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-2.5 h-2.5 rounded-full bg-secondary" />
-                  <span className="text-secondary">Charity Impact</span>
+                  <span className="text-secondary">Rollover</span>
                 </div>
               </div>
             </div>
@@ -205,7 +212,7 @@ const AdminOverview: React.FC = () => {
                     fontSize={11} 
                     tickLine={false} 
                     axisLine={false} 
-                    tickFormatter={(v) => `$${v/1000}k`}
+                    tickFormatter={(v) => `£${v}`}
                   />
                   <Tooltip 
                     contentStyle={{ 
@@ -215,8 +222,8 @@ const AdminOverview: React.FC = () => {
                       fontSize: '12px'
                     }}
                   />
-                  <Area type="monotone" dataKey="revenue" stroke="#10B981" strokeWidth={2.5} fillOpacity={1} fill="url(#colorRev)" />
-                  <Area type="monotone" dataKey="impact" stroke="#F59E0B" strokeWidth={2.5} fillOpacity={0} />
+                  <Area type="monotone" dataKey="prizePool" name="Prize Pool" stroke="#10B981" strokeWidth={2.5} fillOpacity={1} fill="url(#colorRev)" />
+                  <Area type="monotone" dataKey="rollover" name="Rollover" stroke="#F59E0B" strokeWidth={2.5} fillOpacity={0} />
                 </AreaChart>
               </ResponsiveContainer>
             </div>

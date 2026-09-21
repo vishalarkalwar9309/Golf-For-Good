@@ -3,7 +3,7 @@ import { cn } from '../../lib/utils';
 import { Loader2 } from 'lucide-react';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost';
+  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'lime' | 'cream';
   size?: 'sm' | 'md' | 'lg';
   loading?: boolean;
   icon?: React.ReactNode;
@@ -28,8 +28,10 @@ export const Button: React.FC<ButtonProps> = ({
   };
 
   const variantStyles = {
-    primary: "bg-primary text-background hover:bg-primary-light shadow-lg shadow-primary/20 hover:shadow-primary/30",
-    secondary: "bg-secondary text-background hover:bg-secondary-light shadow-lg shadow-secondary/20 hover:shadow-secondary/30",
+    primary: "bg-primary text-[#08090D] hover:bg-primary-light shadow-lg shadow-primary/20 hover:shadow-primary/30",
+    secondary: "bg-secondary text-[#08090D] hover:bg-secondary-light shadow-lg shadow-secondary/20 hover:shadow-secondary/30",
+    lime: "bg-[#CCFF00] text-[#08090D] hover:bg-[#E0FF66] shadow-lg shadow-[#CCFF00]/20 hover:shadow-[#CCFF00]/30 font-bold",
+    cream: "bg-[#FBF9F5] text-[#08090D] hover:bg-white shadow-md text-slate-950 font-semibold",
     outline: "border border-white/15 bg-white/[0.03] text-on-surface hover:bg-white/[0.08] hover:border-white/25",
     ghost: "text-on-surface-variant hover:text-on-surface hover:bg-white/[0.05]"
   };

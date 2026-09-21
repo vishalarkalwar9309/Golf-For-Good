@@ -52,7 +52,7 @@ const UserSidebar: React.FC<UserSidebarProps> = ({ onNavClick }) => {
           </div>
           <div className="flex flex-col">
             <span className="text-lg font-display font-bold tracking-tight text-white leading-none">
-              Play <span className="text-primary">for Good</span>
+              Golf <span className="text-primary">For Good</span>
             </span>
             <div className="mt-1.5">
               <Badge 
