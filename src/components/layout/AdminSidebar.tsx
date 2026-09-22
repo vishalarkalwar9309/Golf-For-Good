@@ -1,18 +1,20 @@
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   Shield, 
   Users, 
   Trophy, 
   Heart, 
-  CreditCard,
-  Award,
-  BarChart3,
-  LayoutDashboard,
-  LogOut
+  CreditCard, 
+  Award, 
+  BarChart3, 
+  LayoutDashboard, 
+  LogOut,
+  Loader2
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useAuth } from '../auth/AuthProvider';
+import { clearUserCache } from '../../services/dataService';
 import { cn } from '../../lib/utils';
 import ProfileChip from '../ui/ProfileChip';
 import { Badge } from '../ui/Badge';
@@ -23,7 +25,37 @@ interface AdminSidebarProps {
 
 const AdminSidebar: React.FC<AdminSidebarProps> = ({ onNavClick }) => {
   const location = useLocation();
+  const navigate = useNavigate();
   const { signOut } = useAuth();
+  const [isSigningOut, setIsSigningOut] = React.useState(false);
+
+  const handleSignOut = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (isSigningOut) return;
+    setIsSigningOut(true);
+
+    try {
+      clearUserCache();
+    } catch (err) {
+      console.error('Error clearing cache:', err);
+    }
+
+    try {
+      await Promise.race([
+        signOut(),
+        new Promise(resolve => setTimeout(resolve, 1500))
+      ]);
+    } catch (err) {
+      console.warn('Admin sign out completed with fallback:', err);
+    }
+
+    try {
+      navigate('/login', { replace: true });
+    } catch {
+      window.location.href = '/login';
+    }
+  };
 
   const menuItems = [
     { icon: LayoutDashboard, label: 'Overview', path: '/admin' },
@@ -115,12 +147,27 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({ onNavClick }) => {
           <ProfileChip showDetails={true} />
         </div>
         <button
-          onClick={signOut}
+          type="button"
+          onClick={handleSignOut}
+          disabled={isSigningOut}
           title="Sign Out"
-          className="p-2 text-on-surface-variant hover:text-rose-400 hover:bg-white/[0.05] rounded-xl transition-colors flex-shrink-0"
           aria-label="Sign Out"
+          className={cn(
+            "relative z-10 flex items-center gap-1.5 px-3 py-2 rounded-xl transition-all duration-200 cursor-pointer flex-shrink-0 text-on-surface-variant hover:text-rose-400 hover:bg-rose-500/10 active:scale-95 border border-transparent hover:border-rose-500/20",
+            isSigningOut && "opacity-80 cursor-wait pointer-events-none"
+          )}
         >
-          <LogOut className="w-4 h-4" />
+          {isSigningOut ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin text-rose-400" />
+              <span className="text-[11px] font-medium text-rose-300">Signing out...</span>
+            </>
+          ) : (
+            <>
+              <LogOut className="w-4 h-4" />
+              <span className="text-[11px] font-medium">Sign Out</span>
+            </>
+          )}
         </button>
       </div>
     </aside>

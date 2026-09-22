@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, Heart, ArrowRight, LayoutDashboard, LogOut } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Menu, X, Heart, ArrowRight, LayoutDashboard, LogOut, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../auth/AuthProvider';
+import { clearUserCache } from '../../services/dataService';
 import { cn } from '../../lib/utils';
 import ProfileChip from '../ui/ProfileChip';
 import { Button } from '../ui/Button';
@@ -10,8 +11,29 @@ import { Button } from '../ui/Button';
 const Navbar: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
   const { user, profile, signOut } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
+
+  const handleSignOut = async () => {
+    if (isSigningOut) return;
+    setIsSigningOut(true);
+    try {
+      clearUserCache();
+    } catch {}
+    try {
+      await Promise.race([
+        signOut(),
+        new Promise(resolve => setTimeout(resolve, 1500))
+      ]);
+    } catch {}
+    try {
+      navigate('/login', { replace: true });
+    } catch {
+      window.location.href = '/login';
+    }
+  };
 
   const isDashboard = location.pathname.startsWith('/dashboard') || location.pathname.startsWith('/admin');
 
@@ -95,12 +117,14 @@ const Navbar: React.FC = () => {
                 </Button>
               </Link>
               <button
-                onClick={signOut}
+                type="button"
+                onClick={handleSignOut}
+                disabled={isSigningOut}
                 title="Sign Out"
-                className="p-2 text-on-surface-variant hover:text-white hover:bg-white/[0.05] rounded-xl transition-colors"
+                className="p-2 text-on-surface-variant hover:text-white hover:bg-white/[0.05] rounded-xl transition-colors cursor-pointer"
                 aria-label="Sign Out"
               >
-                <LogOut className="w-4 h-4" />
+                {isSigningOut ? <Loader2 className="w-4 h-4 animate-spin text-primary" /> : <LogOut className="w-4 h-4" />}
               </button>
             </div>
           ) : (
@@ -166,8 +190,8 @@ const Navbar: React.FC = () => {
                       Open Dashboard
                     </Button>
                   </Link>
-                  <Button variant="outline" size="md" onClick={signOut} className="w-full">
-                    Sign Out
+                  <Button variant="outline" size="md" onClick={handleSignOut} disabled={isSigningOut} className="w-full">
+                    {isSigningOut ? 'Signing out...' : 'Sign Out'}
                   </Button>
                 </div>
               ) : (

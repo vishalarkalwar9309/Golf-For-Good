@@ -133,7 +133,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = async () => {
     try {
-      await supabase.auth.signOut();
+      await Promise.race([
+        supabase.auth.signOut(),
+        new Promise((resolve) => setTimeout(resolve, 1500)),
+      ]);
     } catch (e) {
       console.error('Sign out error:', e);
     } finally {

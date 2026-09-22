@@ -48,12 +48,20 @@ export const useSubscription = () => {
     fetchSubscription();
   }, [fetchSubscription]);
 
-  const createCheckoutSession = async (planType: 'monthly' | 'yearly' = 'monthly') => {
-    if (!user) return;
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
+  const createCheckoutSession = async (planType: 'monthly' | 'yearly' = 'monthly'): Promise<void> => {
+    if (!user) {
+      throw new Error('Please sign in to activate your membership.');
+    }
 
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+
+    // Strict 8-second frontend timeout for the API call
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+    let checkoutData: any = {};
+    try {
       const response = await fetch('/api/create-checkout', {
         method: 'POST',
         headers: {
@@ -61,16 +69,44 @@ export const useSubscription = () => {
           ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({ planType }),
+        signal: controller.signal,
       });
 
-      const checkoutData = await response.json();
-      if (!response.ok || checkoutData.error) {
-        throw new Error(checkoutData.error || 'Failed to initialize checkout');
+      const responseText = await response.text();
+      try {
+        checkoutData = JSON.parse(responseText);
+      } catch {
+        checkoutData = { error: responseText || 'Invalid server response' };
       }
 
-      const { subscriptionId, keyId, name, description, userEmail, userName } = checkoutData;
+      if (!response.ok || checkoutData.error) {
+        throw new Error(checkoutData.error || `Checkout failed (${response.status})`);
+      }
+    } catch (fetchErr: any) {
+      if (fetchErr.name === 'AbortError') {
+        throw new Error('Activation is taking longer than expected');
+      }
+      throw fetchErr;
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
-      if (typeof window !== 'undefined' && (window as any).Razorpay && keyId && subscriptionId) {
+    const { subscriptionId, keyId, name, description, userEmail, userName } = checkoutData;
+
+    if (!keyId || !subscriptionId) {
+      throw new Error(
+        'Unable to activate membership: Razorpay test configuration is missing on the server.'
+      );
+    }
+
+    if (typeof window === 'undefined' || !(window as any).Razorpay) {
+      throw new Error(
+        'Unable to activate membership: Razorpay checkout script failed to load. Please disable ad-blockers and try again.'
+      );
+    }
+
+    return new Promise<void>((resolve, reject) => {
+      try {
         const rzp = new (window as any).Razorpay({
           key: keyId,
           subscription_id: subscriptionId,
@@ -84,22 +120,35 @@ export const useSubscription = () => {
           theme: {
             color: '#10b981',
           },
+          modal: {
+            ondismiss: function () {
+              const cancelErr = new Error('Activation was cancelled');
+              cancelErr.name = 'CancelError';
+              reject(cancelErr);
+            },
+          },
           handler: async function () {
-            await fetchSubscription();
-            await refreshProfile();
-            window.location.href = '/dashboard/subscription?success=true';
+            try {
+              invalidateSubscription(user.id);
+              await fetchSubscription(true);
+              await refreshProfile();
+            } catch (refreshErr) {
+              console.warn('Subscription post-payment refresh warning:', refreshErr);
+            }
+            resolve();
           },
         });
+
+        rzp.on('payment.failed', function (resp: any) {
+          const msg = resp?.error?.description || 'Payment could not be completed';
+          reject(new Error(msg));
+        });
+
         rzp.open();
-      } else {
-        // Fallback for simulation / test environments
-        const fallbackAmount = planType === 'yearly' ? 4999 : 499;
-        await activateMembership(planType, fallbackAmount);
+      } catch (err: any) {
+        reject(new Error(err?.message || 'Failed to initialize payment gateway'));
       }
-    } catch (err: any) {
-      console.error('Checkout error:', err);
-      throw err;
-    }
+    });
   };
 
   const createPortalSession = async () => {

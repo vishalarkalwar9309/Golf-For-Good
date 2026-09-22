@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Check, Loader2, ShieldCheck, CreditCard, ArrowRight, X, Star, Zap } from 'lucide-react';
+import { Check, Loader2, ShieldCheck, ArrowRight, X, Star, Zap, Clock, AlertCircle, XCircle, RefreshCw } from 'lucide-react';
 import { cn, formatCurrency } from '../../lib/utils';
 import type { Charity } from '../../types';
 
@@ -13,6 +13,8 @@ interface CheckoutConfirmationProps {
   selectedCharity?: Charity;
 }
 
+type CheckoutStatus = 'idle' | 'processing' | 'success' | 'cancelled' | 'error' | 'timeout';
+
 const CheckoutConfirmation: React.FC<CheckoutConfirmationProps> = ({
   isOpen,
   onClose,
@@ -21,19 +23,60 @@ const CheckoutConfirmation: React.FC<CheckoutConfirmationProps> = ({
   amount,
   selectedCharity
 }) => {
-  const [status, setStatus] = React.useState<'idle' | 'processing' | 'success'>('idle');
-  const [error, setError] = React.useState<string | null>(null);
+  const [status, setStatus] = React.useState<CheckoutStatus>('idle');
+  const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
+  const watchdogRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  React.useEffect(() => {
+    if (isOpen) {
+      setStatus('idle');
+      setErrorMessage(null);
+    }
+    return () => {
+      if (watchdogRef.current) clearTimeout(watchdogRef.current);
+    };
+  }, [isOpen]);
 
   const handleConfirm = async () => {
     setStatus('processing');
-    setError(null);
+    setErrorMessage(null);
+
+    // Hard 8-second frontend watchdog to guarantee the UI NEVER stays stuck on "Activating Membership..."
+    if (watchdogRef.current) clearTimeout(watchdogRef.current);
+    watchdogRef.current = setTimeout(() => {
+      setStatus(prev => {
+        if (prev === 'processing') {
+          setErrorMessage('Activation is taking longer than expected');
+          return 'timeout';
+        }
+        return prev;
+      });
+    }, 8000);
+
     try {
       await onConfirm();
-      setStatus('idle');
-      onClose();
+      if (watchdogRef.current) clearTimeout(watchdogRef.current);
+      setStatus('success');
     } catch (err: any) {
-      setError(err.message || 'Activation failed. Please try again.');
-      setStatus('idle');
+      if (watchdogRef.current) clearTimeout(watchdogRef.current);
+      const isTimeout =
+        err.name === 'AbortError' ||
+        err.message?.includes('longer than expected') ||
+        err.message?.includes('timeout');
+      const isCancelled =
+        err.name === 'CancelError' ||
+        err.message?.toLowerCase().includes('cancel');
+
+      if (isCancelled) {
+        setStatus('cancelled');
+        setErrorMessage('Activation was cancelled. You can retry whenever you are ready.');
+      } else if (isTimeout) {
+        setStatus('timeout');
+        setErrorMessage('Activation is taking longer than expected');
+      } else {
+        setStatus('error');
+        setErrorMessage(err.message || 'Unable to activate membership. Please try again.');
+      }
     }
   };
 
@@ -75,6 +118,7 @@ const CheckoutConfirmation: React.FC<CheckoutConfirmationProps> = ({
                   Your membership is confirmed. Your participation in the upcoming monthly draw and charitable contribution is officially activated.
                 </p>
                 <button
+                  type="button"
                   onClick={onClose}
                   className="w-full py-4 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 transition-all shadow-lg shadow-primary/20"
                 >
@@ -85,6 +129,7 @@ const CheckoutConfirmation: React.FC<CheckoutConfirmationProps> = ({
               <>
                 {/* Close Button */}
                 <button
+                  type="button"
                   onClick={onClose}
                   disabled={status === 'processing'}
                   className="absolute top-6 right-6 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-0"
@@ -151,33 +196,78 @@ const CheckoutConfirmation: React.FC<CheckoutConfirmationProps> = ({
                     </div>
                   )}
 
-                  {error && (
-                    <div className="p-4 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-xs text-center mb-6">
-                      {error}
+                  {/* Status Banner: Timeout */}
+                  {status === 'timeout' && (
+                    <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-200 text-xs mb-6">
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <Clock className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                        <span className="font-semibold text-foreground">Activation is taking longer than expected</span>
+                      </div>
+                      <p className="text-muted-foreground text-[11px] leading-relaxed">
+                        The payment service did not respond in time. Please check your network connection and retry.
+                      </p>
                     </div>
                   )}
 
-                  <button
-                    onClick={handleConfirm}
-                    disabled={status === 'processing'}
-                    className="w-full py-4 rounded-xl bg-primary text-primary-foreground font-semibold text-sm transition-all hover:opacity-90 active:scale-[0.99] shadow-lg shadow-primary/20 flex items-center justify-center gap-2 disabled:opacity-50 group"
-                  >
-                    {status === 'processing' ? (
-                      <>
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                        <span>Activating Membership...</span>
-                      </>
-                    ) : (
-                      <>
-                        <span>Confirm & Activate</span>
-                        <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                      </>
-                    )}
-                  </button>
+                  {/* Status Banner: Error */}
+                  {status === 'error' && (
+                    <div className="p-4 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-xs mb-6">
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <AlertCircle className="w-4 h-4 text-destructive flex-shrink-0" />
+                        <span className="font-semibold text-foreground">Unable to activate membership</span>
+                      </div>
+                      <p className="text-muted-foreground text-[11px] leading-relaxed">
+                        {errorMessage || 'Unable to complete activation with the payment provider. Please retry.'}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Status Banner: Cancelled */}
+                  {status === 'cancelled' && (
+                    <div className="p-4 rounded-xl bg-surface-container-high border border-white/10 text-muted-foreground text-xs mb-6">
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <XCircle className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                        <span className="font-semibold text-foreground">Checkout Cancelled</span>
+                      </div>
+                      <p className="text-muted-foreground text-[11px] leading-relaxed">
+                        Payment was not completed. You can retry whenever you are ready.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Action Button */}
+                  {status === 'processing' ? (
+                    <button
+                      type="button"
+                      disabled={true}
+                      className="w-full py-4 rounded-xl bg-primary text-primary-foreground font-semibold text-sm transition-all shadow-lg shadow-primary/20 flex items-center justify-center gap-2 opacity-75 cursor-wait"
+                    >
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      <span>Activating Membership...</span>
+                    </button>
+                  ) : status === 'timeout' || status === 'error' || status === 'cancelled' ? (
+                    <button
+                      type="button"
+                      onClick={handleConfirm}
+                      className="w-full py-4 rounded-xl bg-primary text-primary-foreground font-semibold text-sm transition-all hover:opacity-90 active:scale-[0.99] shadow-lg shadow-primary/20 flex items-center justify-center gap-2 group"
+                    >
+                      <RefreshCw className="w-4 h-4 group-hover:rotate-180 transition-transform" />
+                      <span>Retry Activation</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleConfirm}
+                      className="w-full py-4 rounded-xl bg-primary text-primary-foreground font-semibold text-sm transition-all hover:opacity-90 active:scale-[0.99] shadow-lg shadow-primary/20 flex items-center justify-center gap-2 group"
+                    >
+                      <span>Confirm & Activate</span>
+                      <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                    </button>
+                  )}
 
                   <p className="mt-6 text-[11px] text-center text-muted-foreground leading-relaxed">
                     By activating, you agree to the Membership Terms. <br />
-                    No recurring charges in demonstration mode.
+                    Demonstration environment — test payment details only.
                   </p>
                 </div>
               </>

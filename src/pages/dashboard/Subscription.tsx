@@ -42,9 +42,9 @@ const Subscription: React.FC = () => {
     if (!selectedPlan) return;
     try {
       await createCheckoutSession(selectedPlan.type);
-      setSelectedPlan(null);
     } catch (err) {
       console.error('Activation failed:', err);
+      throw err;
     }
   };
 

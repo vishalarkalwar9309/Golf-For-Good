@@ -1,10 +1,10 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseAdmin = createClient(
-  process.env.VITE_SUPABASE_URL as string,
-  process.env.SUPABASE_SERVICE_ROLE_KEY as string
-);
+const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || 'https://gnulgjyrmnijfyfkwjyp.supabase.co';
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+
+const supabaseAdmin = createClient(supabaseUrl, supabaseKey || '');
 
 // Fixed demo pricing per specification
 const PLAN_CONFIG = {
@@ -34,10 +34,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const token = authHeader.split(' ')[1];
-  const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-
-  if (authError || !user) {
-    return res.status(401).json({ error: 'Invalid or expired session' });
+  let user;
+  try {
+    const { data, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !data?.user) {
+      return res.status(401).json({ error: 'Invalid or expired session. Please sign in again.' });
+    }
+    user = data.user;
+  } catch (err: any) {
+    return res.status(401).json({ error: 'Authentication service unavailable.' });
   }
 
   const planType: 'monthly' | 'yearly' = req.body?.planType === 'yearly' ? 'yearly' : 'monthly';
@@ -48,9 +53,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (!keyId || !keySecret) {
     return res.status(500).json({
-      error: 'Razorpay credentials not configured. Please set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET.',
+      error: 'Razorpay credentials not configured on server. Please set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET.',
     });
   }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 6000);
 
   try {
     const authString = Buffer.from(`${keyId}:${keySecret}`).toString('base64');
@@ -71,6 +79,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           planType,
         },
       }),
+      signal: controller.signal,
     });
 
     const data = await response.json();
@@ -94,7 +103,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       userName: (user.user_metadata as any)?.full_name || '',
     });
   } catch (err: any) {
+    if (err.name === 'AbortError') {
+      return res.status(504).json({ error: 'Payment gateway request timed out. Please try again.' });
+    }
     console.error('Checkout initialization error:', err);
     return res.status(500).json({ error: err.message || 'Internal server error' });
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
