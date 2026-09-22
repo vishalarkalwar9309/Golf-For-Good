@@ -23,6 +23,15 @@ const DrawsHistory: React.FC = () => {
   }, []);
 
   const fetchDraws = async () => {
+    setLoading(true);
+    let isCancelled = false;
+
+    const watchdog = setTimeout(() => {
+      if (!isCancelled) {
+        setLoading(false);
+      }
+    }, 6000);
+
     try {
       const { data, error } = await supabase
         .from('draws')
@@ -30,15 +39,18 @@ const DrawsHistory: React.FC = () => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setDraws(data || []);
+      if (!isCancelled) setDraws(data || []);
     } catch (err) {
       console.error('Error fetching draws:', err);
     } finally {
-      setLoading(false);
+      clearTimeout(watchdog);
+      if (!isCancelled) {
+        setLoading(false);
+      }
     }
   };
 
-  if (loading || subLoading) {
+  if (loading && subLoading) {
     return (
       <div className="flex items-center justify-center min-h-[500px]">
         <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />

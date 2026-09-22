@@ -40,23 +40,40 @@ const Onboarding: React.FC = () => {
   const fetchCharities = async () => {
     setLoadingCharities(true);
     setFetchError(null);
+    let isCancelled = false;
+
+    const watchdog = setTimeout(() => {
+      if (!isCancelled) {
+        setLoadingCharities(false);
+      }
+    }, 6000);
+
     try {
       const { data, error } = await supabase
         .from('charities')
         .select('*')
-        .order('name');
+        .order('total_raised', { ascending: false });
+      
       if (error) throw error;
-      setCharities(data || []);
-      if (data && data.length > 0 && !selectedCharity) {
-        // Pre-select first charity or if profile already had one
-        const pre = data.find(c => c.id === profile?.selected_charity_id) || data[0];
-        setSelectedCharity(pre);
+      if (!isCancelled) {
+        setCharities(data || []);
+        
+        if (data && data.length > 0 && !selectedCharity) {
+          // Pre-select first charity or if profile already had one
+          const pre = data.find(c => c.id === profile?.selected_charity_id) || data[0];
+          setSelectedCharity(pre);
+        }
       }
     } catch (err: any) {
       console.error('Error fetching charities:', err);
-      setFetchError(err.message || 'Failed to load charity partners.');
+      if (!isCancelled) {
+        setFetchError(err.message || 'Failed to load charity partners.');
+      }
     } finally {
-      setLoadingCharities(false);
+      clearTimeout(watchdog);
+      if (!isCancelled) {
+        setLoadingCharities(false);
+      }
     }
   };
 
@@ -154,6 +171,21 @@ const Onboarding: React.FC = () => {
       <AbstractGraphic variant="hero-mesh" className="opacity-40" />
 
       <div className="max-w-4xl mx-auto w-full px-6 relative z-10 flex-grow flex flex-col">
+        {/* Top Header with Brand & Exit Setup */}
+        <div className="flex items-center justify-between mb-8 pb-4 border-b border-white/[0.08]">
+          <div className="flex items-center gap-2">
+            <span className="font-display font-bold text-lg text-white">Golf <span className="text-primary">For Good</span></span>
+            <span className="text-xs text-muted-foreground hidden sm:inline">&bull; Account Setup</span>
+          </div>
+          <button
+            onClick={() => navigate('/dashboard')}
+            className="text-xs font-semibold text-muted-foreground hover:text-white transition-colors px-3 py-1.5 rounded-lg border border-white/10 hover:border-white/20 bg-white/[0.02]"
+            title="Leave setup and view your dashboard"
+          >
+            Exit to Dashboard
+          </button>
+        </div>
+
         {/* Step Indicator Header */}
         <div className="mb-10">
           <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">

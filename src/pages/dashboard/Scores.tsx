@@ -50,6 +50,15 @@ const Scores: React.FC = () => {
   }, [user]);
 
   const fetchScores = async () => {
+    setLoading(true);
+    let isCancelled = false;
+
+    const watchdog = setTimeout(() => {
+      if (!isCancelled) {
+        setLoading(false);
+      }
+    }, 6000);
+
     try {
       const { data, error } = await supabase
         .from('scores')
@@ -58,11 +67,18 @@ const Scores: React.FC = () => {
         .order('date', { ascending: false });
 
       if (error) throw error;
-      setScores(data || []);
+      if (!isCancelled) {
+        setScores(data || []);
+      }
     } catch (err: any) {
-      console.error('Error fetching scores:', err);
+      if (!isCancelled) {
+        setError(err.message);
+      }
     } finally {
-      setLoading(false);
+      clearTimeout(watchdog);
+      if (!isCancelled) {
+        setLoading(false);
+      }
     }
   };
 
@@ -184,7 +200,7 @@ const Scores: React.FC = () => {
     ? (scores.reduce((acc, s) => acc + s.stableford_points, 0) / scores.length).toFixed(1)
     : '0.0';
 
-  if (loading || subLoading) {
+  if (loading && subLoading) {
     return (
       <div className="flex items-center justify-center min-h-[500px]">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />

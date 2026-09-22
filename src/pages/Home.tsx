@@ -7,14 +7,18 @@ import {
   ArrowRight, 
   Target, 
   CheckCircle2, 
-  Sparkles,
-  ExternalLink,
-  ShieldCheck,
-  Award,
-  Globe,
-  TrendingUp,
-  HelpCircle,
-  Zap
+  Sparkles, 
+  ShieldCheck, 
+  Award, 
+  Globe, 
+  TrendingUp, 
+  HelpCircle, 
+  Zap,
+  Lock,
+  Calendar,
+  Check,
+  Percent,
+  Coins
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { formatCurrency, cn } from '../lib/utils';
@@ -36,77 +40,95 @@ const Home: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let isMounted = true;
     const loadHomeData = async () => {
       try {
         const [rolloverAmount, { data: charitiesData }, { data: latestDrawData }] = await Promise.all([
-          getLatestRollover(),
-          supabase.from('charities').select('*').eq('featured', true).limit(3),
+          getLatestRollover().catch(() => 0),
+          supabase.from('charities').select('*').limit(6),
           supabase.from('draws').select('draw_month, status').order('created_at', { ascending: false }).limit(1).maybeSingle()
         ]);
 
+        if (!isMounted) return;
+
         setLatestRollover(rolloverAmount || 0);
-        setFeaturedCharities(charitiesData || []);
-        if (latestDrawData) {
-          setActiveDrawMonth(latestDrawData.draw_month);
+
+        if (charitiesData && charitiesData.length > 0) {
+          const featured = charitiesData.filter(c => c.featured);
+          setFeaturedCharities(featured.length >= 3 ? featured.slice(0, 3) : charitiesData.slice(0, 3));
+        }
+
+        if (latestDrawData && (latestDrawData as any).draw_month) {
+          setActiveDrawMonth((latestDrawData as any).draw_month);
+        } else {
+          const now = new Date();
+          setActiveDrawMonth(now.toLocaleString('en-US', { month: 'long', year: 'numeric' }));
         }
       } catch (err) {
         console.error('Error loading home data:', err);
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     };
 
     loadHomeData();
+    return () => { isMounted = false; };
   }, []);
 
   return (
     <div className="flex flex-col min-h-screen bg-background text-on-surface overflow-hidden">
       {/* ============================================================ */}
-      {/* 1. HERO SECTION (Asymmetric Editorial Composition) */}
+      {/* 1. HERO SECTION (Rich Editorial Composition) */}
       {/* ============================================================ */}
-      <section className="relative pt-32 pb-20 md:pt-44 md:pb-32 px-6 md:px-12 overflow-hidden">
-        {/* Layered Organic Contours & Ambient Atmosphere (Restrained) */}
+      <section className="relative pt-28 pb-20 md:pt-40 md:pb-28 px-6 md:px-12 overflow-hidden">
+        {/* Layered Organic Contours & Ambient Atmosphere */}
         <AbstractGraphic variant="hero-mesh" glowColor="emerald" />
         <AbstractGraphic variant="organic-topography" glowColor="lime" className="absolute top-10 right-0 w-[600px] h-[500px]" />
 
         <div className="max-w-7xl mx-auto w-full relative z-10">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-            {/* Left Headline Column */}
-            <div className="lg:col-span-8">
-              {/* Live Draw Ticker */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
+            {/* Left Column: Core Narrative & Value Proposition */}
+            <div className="lg:col-span-7">
+              {/* Live Draw & Pricing Ticker */}
               <FadeSlide direction="down" delay={0.08} distance={14}>
-                <div className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-surface-container border border-white/10 text-xs font-semibold mb-8 backdrop-blur-md">
-                  <span className="w-2 h-2 rounded-full bg-[#CCFF00] animate-pulse" />
-                  <span className="text-[#CCFF00] font-mono tracking-wide uppercase">
-                    {activeDrawMonth ? `${activeDrawMonth} Community Draw` : 'Monthly Charity Draw'}
-                  </span>
-                  {latestRollover > 0 && (
-                    <>
-                      <span className="w-1 h-1 rounded-full bg-white/20" />
-                      <span className="text-amber-300 font-bold">
-                        {formatCurrency(latestRollover)} Rollover
-                      </span>
-                    </>
-                  )}
+                <div className="flex flex-wrap items-center gap-2.5 mb-6">
+                  <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-surface-container border border-white/10 text-xs font-semibold backdrop-blur-md">
+                    <span className="w-2 h-2 rounded-full bg-[#CCFF00] animate-pulse" />
+                    <span className="text-[#CCFF00] font-mono tracking-wide uppercase">
+                      {activeDrawMonth ? `${activeDrawMonth} Cycle` : 'Active Draw Cycle'}
+                    </span>
+                    {latestRollover > 0 && (
+                      <>
+                        <span className="w-1 h-1 rounded-full bg-white/20" />
+                        <span className="text-amber-300 font-bold font-mono">
+                          {formatCurrency(latestRollover)} Rollover
+                        </span>
+                      </>
+                    )}
+                  </div>
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-xs font-medium text-emerald-300">
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Monthly ₹499 &bull; Annual ₹4,999</span>
+                  </div>
                 </div>
               </FadeSlide>
 
-              {/* Main Headline with Editorial Word-Level Text Reveal */}
-              <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-display font-extrabold tracking-tight text-white leading-[1.04] mb-8">
-                <TextReveal text="Your game can" delay={0.15} /> <br />
-                <TextReveal text="do more." highlightWords={['do', 'more']} delay={0.25} />
+              {/* Main Headline */}
+              <h1 className="text-5xl sm:text-6xl md:text-7xl font-display font-black tracking-tight text-white leading-[1.04] mb-6">
+                <TextReveal text="Play your game." delay={0.12} /> <br />
+                <TextReveal text="Make it count." highlightWords={['Make', 'it', 'count.']} delay={0.22} />
               </h1>
 
               {/* Supporting Copy */}
-              <FadeSlide direction="up" delay={0.3} distance={16}>
-                <p className="text-lg sm:text-xl md:text-2xl text-on-surface-variant font-sans leading-relaxed max-w-2xl mb-10">
-                  Track your Stableford performance, take part in monthly draws, and turn your subscription into meaningful charitable impact.
+              <FadeSlide direction="up" delay={0.28} distance={16}>
+                <p className="text-lg sm:text-xl text-on-surface-variant font-sans leading-relaxed max-w-2xl mb-8">
+                  Enter your 18-hole Stableford scores from any certified course. Match monthly drawn numbers to win from the 50% subscriber prize pool, and automatically direct 10% to 100% of your contribution to verified UK charities.
                 </p>
               </FadeSlide>
 
               {/* Action Buttons */}
-              <FadeSlide direction="up" delay={0.38} distance={16}>
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 max-w-md sm:max-w-none">
+              <FadeSlide direction="up" delay={0.34} distance={16}>
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 max-w-md sm:max-w-none mb-10">
                   <Link to="/signup">
                     <Button variant="lime" size="lg" className="w-full sm:w-auto" icon={<ArrowRight className="w-5 h-5 text-[#08090D]" />}>
                       Join Golf For Good
@@ -114,67 +136,134 @@ const Home: React.FC = () => {
                   </Link>
                   <Link to="/how-it-works">
                     <Button variant="outline" size="lg" className="w-full sm:w-auto">
-                      See how it works
+                      Explore the Mechanics
                     </Button>
                   </Link>
                 </div>
               </FadeSlide>
+
+              {/* Trust & Mechanics Micro-Pill Row */}
+              <FadeSlide direction="up" delay={0.4} distance={16}>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-6 border-t border-white/[0.08]">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                    <span className="text-xs text-on-surface-variant font-medium">PCI-DSS Secure</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Heart className="w-4 h-4 text-rose-400 flex-shrink-0" />
+                    <span className="text-xs text-on-surface-variant font-medium">10% Min Charity</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Target className="w-4 h-4 text-[#CCFF00] flex-shrink-0" />
+                    <span className="text-xs text-on-surface-variant font-medium">5 Retained Scores</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Trophy className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                    <span className="text-xs text-on-surface-variant font-medium">3 Prize Tiers</span>
+                  </div>
+                </div>
+              </FadeSlide>
             </div>
 
-            {/* Right Editorial Callout Card */}
-            <div className="lg:col-span-4">
-              <FadeSlide direction="right" delay={0.35} distance={20}>
-                <div className="surface-editorial p-8 relative overflow-hidden border border-white/10">
-                  <div className="flex items-center justify-between mb-6">
-                    <span className="text-xs font-mono uppercase tracking-widest text-[#CCFF00]">
-                      The Model
-                    </span>
-                    <span className="text-xs font-bold text-white/60">
-                      Transparent
+            {/* Right Column: Live Draw Chamber & Model Preview Card */}
+            <div className="lg:col-span-5">
+              <FadeSlide direction="left" delay={0.3} distance={20}>
+                <div className="surface-editorial p-7 sm:p-8 relative overflow-hidden border border-white/10 rounded-3xl shadow-2xl backdrop-blur-xl">
+                  {/* Card Header */}
+                  <div className="flex items-center justify-between pb-5 border-b border-white/[0.08] mb-6">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+                      <span className="text-xs font-mono uppercase tracking-widest text-[#CCFF00] font-bold">
+                        Draw Mechanics
+                      </span>
+                    </div>
+                    <span className="text-[11px] font-mono font-medium text-white/60 bg-white/[0.05] px-2.5 py-1 rounded-md border border-white/[0.06]">
+                      {activeDrawMonth}
                     </span>
                   </div>
 
-                  <div className="space-y-6">
-                    <div className="flex items-start gap-4">
-                      <div className="w-9 h-9 rounded-xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center flex-shrink-0 font-display font-bold text-sm">
-                        P
-                      </div>
-                      <div>
-                        <h4 className="font-display font-bold text-white text-base">Play & Log</h4>
-                        <p className="text-xs text-on-surface-variant mt-0.5 leading-relaxed">
-                          Submit 18-hole Stableford scores from any regulation golf round.
-                        </p>
-                      </div>
+                  {/* Chamber Visual: 5 Numbers Display */}
+                  <div className="mb-6">
+                    <div className="flex items-center justify-between text-xs text-on-surface-variant mb-2.5">
+                      <span className="font-semibold text-white">5-Ball Draw Chamber</span>
+                      <span className="text-[11px] text-emerald-400 font-mono">1–45 Stableford Pts</span>
                     </div>
-
-                    <div className="flex items-start gap-4">
-                      <div className="w-9 h-9 rounded-xl bg-amber-500/15 text-amber-400 flex items-center justify-center flex-shrink-0 font-display font-bold text-sm">
-                        W
-                      </div>
-                      <div>
-                        <h4 className="font-display font-bold text-white text-base">Win Cash Prizes</h4>
-                        <p className="text-xs text-on-surface-variant mt-0.5 leading-relaxed">
-                          Match 3, 4, or 5 numbers in the monthly community draw.
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-start gap-4">
-                      <div className="w-9 h-9 rounded-xl bg-rose-500/15 text-rose-400 flex items-center justify-center flex-shrink-0 font-display font-bold text-sm">
-                        G
-                      </div>
-                      <div>
-                        <h4 className="font-display font-bold text-white text-base">Give Back</h4>
-                        <p className="text-xs text-on-surface-variant mt-0.5 leading-relaxed">
-                          Direct allocation to verified charitable partners of your choice.
-                        </p>
-                      </div>
+                    <div className="grid grid-cols-5 gap-2">
+                      {[41, 38, 36, 32, 29].map((num, idx) => (
+                        <div 
+                          key={idx} 
+                          className="h-14 rounded-2xl bg-gradient-to-b from-[#131B26] to-[#0A0E15] border border-white/10 flex flex-col items-center justify-center text-center group hover:border-[#CCFF00]/50 transition-colors"
+                        >
+                          <span className="text-[9px] font-mono text-on-surface-variant uppercase">Ball {idx + 1}</span>
+                          <span className="font-display font-black text-lg text-white group-hover:text-[#CCFF00] transition-colors">
+                            {num}
+                          </span>
+                        </div>
+                      ))}
                     </div>
                   </div>
 
-                  <div className="mt-8 pt-6 border-t border-white/[0.08] flex items-center justify-between text-xs text-on-surface-variant">
-                    <span>Guaranteed minimum</span>
-                    <span className="font-bold text-white">10% to Charity</span>
+                  {/* 3 Prize Tiers Breakdown */}
+                  <div className="space-y-3 mb-6">
+                    <div className="p-3 rounded-xl bg-amber-500/[0.07] border border-amber-500/20 flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-6 h-6 rounded-md bg-amber-500/20 text-amber-300 font-display font-bold text-xs flex items-center justify-center">
+                          5
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-white">5 of 5 Match &bull; Jackpot</p>
+                          <p className="text-[10px] text-amber-300/80">Carries forward if unclaimed</p>
+                        </div>
+                      </div>
+                      <span className="font-display font-bold text-sm text-amber-400">40% Pool</span>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-emerald-500/[0.07] border border-emerald-500/20 flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-6 h-6 rounded-md bg-emerald-500/20 text-emerald-300 font-display font-bold text-xs flex items-center justify-center">
+                          4
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-white">4 of 5 Match &bull; Tier 2</p>
+                          <p className="text-[10px] text-emerald-300/80">Equal split among winners</p>
+                        </div>
+                      </div>
+                      <span className="font-display font-bold text-sm text-emerald-400">35% Pool</span>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-teal-500/[0.07] border border-teal-500/20 flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-6 h-6 rounded-md bg-teal-500/20 text-teal-300 font-display font-bold text-xs flex items-center justify-center">
+                          3
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-white">3 of 5 Match &bull; Tier 3</p>
+                          <p className="text-[10px] text-teal-300/80">Accessible regular reward</p>
+                        </div>
+                      </div>
+                      <span className="font-display font-bold text-sm text-teal-400">25% Pool</span>
+                    </div>
+                  </div>
+
+                  {/* Guaranteed Charity Allocation Bar */}
+                  <div className="pt-4 border-t border-white/[0.08]">
+                    <div className="flex items-center justify-between text-xs mb-2">
+                      <span className="text-on-surface-variant flex items-center gap-1.5">
+                        <Heart className="w-3.5 h-3.5 text-rose-400 fill-rose-400/30" />
+                        Charity Allocation
+                      </span>
+                      <span className="font-bold text-white">10% Min &rarr; 100% User Choice</span>
+                    </div>
+                    <div className="w-full h-2 rounded-full bg-white/[0.06] overflow-hidden flex">
+                      <div className="h-full bg-rose-500 w-[15%]" title="10% Guaranteed Minimum" />
+                      <div className="h-full bg-rose-400/40 w-[35%]" title="Up to 100% Discretionary" />
+                      <div className="h-full bg-emerald-500/50 w-[50%]" title="50% Prize Pool" />
+                    </div>
+                    <div className="flex items-center justify-between text-[10px] text-on-surface-variant mt-1.5">
+                      <span>10% Base</span>
+                      <span className="text-rose-300 font-medium">Your chosen charity partner</span>
+                      <span>50% Prize Pool</span>
+                    </div>
                   </div>
                 </div>
               </FadeSlide>
@@ -184,19 +273,19 @@ const Home: React.FC = () => {
       </section>
 
       {/* ============================================================ */}
-      {/* 2. PLAY / WIN / GIVE BACK (The 3 Pillars) */}
+      {/* 2. PLAY / WIN / GIVE BACK (The 3 Pillars Architecture) */}
       {/* ============================================================ */}
       <section className="py-24 px-6 md:px-12 relative bg-[#090C12] border-y border-white/[0.06]">
         <div className="max-w-7xl mx-auto">
           <FadeSlide direction="up" delay={0.05} className="max-w-3xl mb-16">
             <Badge variant="cream" size="md" className="mb-4">
-              Core Pillars
+              The Three Moves
             </Badge>
             <h2 className="text-3xl sm:text-4xl md:text-5xl font-display font-bold tracking-tight text-white mb-4">
-              A smarter way to play and give.
+              A smarter way to play, win, and give.
             </h2>
             <p className="text-base sm:text-lg text-on-surface-variant leading-relaxed">
-              Every round you log on the course connects your regular performance to real prizes and measurable community impact.
+              Every round you log connects your regular course performance to transparent cash prize draws and audited charitable impact.
             </p>
           </FadeSlide>
 
@@ -206,7 +295,7 @@ const Home: React.FC = () => {
               <motion.div 
                 whileHover={!shouldReduceMotion ? { y: -6, transition: { duration: 0.18 } } : undefined}
                 whileTap={!shouldReduceMotion ? { scale: 0.99 } : undefined}
-                className="surface-card p-8 sm:p-10 flex flex-col justify-between border-emerald-500/20 hover:border-emerald-500/40 transition-colors group h-full cursor-pointer"
+                className="surface-card p-8 sm:p-10 flex flex-col justify-between border-emerald-500/20 hover:border-emerald-500/40 transition-colors group h-full"
               >
                 <div>
                   <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center mb-8 border border-emerald-500/20 group-hover:scale-105 transition-transform">
@@ -216,14 +305,15 @@ const Home: React.FC = () => {
                     01 &bull; PLAY
                   </span>
                   <h3 className="text-2xl font-display font-bold text-white mb-3">
-                    Keep your game moving.
+                    Log Any Regulation Round
                   </h3>
-                  <p className="text-sm text-on-surface-variant leading-relaxed font-sans">
-                    Track your latest Stableford rounds and see your progress without losing sight of what matters. Enter points from 1–45 with no complicated handicap hurdles.
+                  <p className="text-sm text-on-surface-variant leading-relaxed font-sans mb-6">
+                    Enter your 18-hole Stableford scores (1–45 points) from weekend games or club competitions. The platform automatically tracks and retains your 5 most recent rounds as your active draw numbers.
                   </p>
                 </div>
-                <div className="pt-6 mt-8 border-t border-white/[0.06] flex items-center gap-2 text-xs font-semibold text-emerald-400">
-                  <span>5 active qualifying rounds retained</span>
+                <div className="pt-6 border-t border-white/[0.06] flex items-center justify-between text-xs">
+                  <span className="text-on-surface-variant">Active Entry:</span>
+                  <span className="font-semibold text-emerald-400">5 Latest Rounds Retained</span>
                 </div>
               </motion.div>
             </StaggerItem>
@@ -233,7 +323,7 @@ const Home: React.FC = () => {
               <motion.div 
                 whileHover={!shouldReduceMotion ? { y: -6, transition: { duration: 0.18 } } : undefined}
                 whileTap={!shouldReduceMotion ? { scale: 0.99 } : undefined}
-                className="surface-card p-8 sm:p-10 flex flex-col justify-between border-amber-500/20 hover:border-amber-500/40 transition-colors group h-full cursor-pointer"
+                className="surface-card p-8 sm:p-10 flex flex-col justify-between border-amber-500/20 hover:border-amber-500/40 transition-colors group h-full"
               >
                 <div>
                   <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-400 flex items-center justify-center mb-8 border border-amber-500/20 group-hover:scale-105 transition-transform">
@@ -243,14 +333,15 @@ const Home: React.FC = () => {
                     02 &bull; WIN
                   </span>
                   <h3 className="text-2xl font-display font-bold text-white mb-3">
-                    Your score could take you further.
+                    Monthly Community Draws
                   </h3>
-                  <p className="text-sm text-on-surface-variant leading-relaxed font-sans">
-                    Your Stableford scores become part of the monthly draw, with opportunities to match 3, 4, or 5 numbers against independently drawn winning numbers.
+                  <p className="text-sm text-on-surface-variant leading-relaxed font-sans mb-6">
+                    At the end of every calendar month, 5 independent numbers are generated. Match 3, 4, or 5 of your scores to win an equal share of the subscriber prize pool. Unclaimed 5-match jackpots roll over.
                   </p>
                 </div>
-                <div className="pt-6 mt-8 border-t border-white/[0.06] flex items-center gap-2 text-xs font-semibold text-amber-400">
-                  <span>3 winning tiers &bull; 5-match jackpot rollover</span>
+                <div className="pt-6 border-t border-white/[0.06] flex items-center justify-between text-xs">
+                  <span className="text-on-surface-variant">Prize Tiers:</span>
+                  <span className="font-semibold text-amber-400">40% / 35% / 25% Split</span>
                 </div>
               </motion.div>
             </StaggerItem>
@@ -260,7 +351,7 @@ const Home: React.FC = () => {
               <motion.div 
                 whileHover={!shouldReduceMotion ? { y: -6, transition: { duration: 0.18 } } : undefined}
                 whileTap={!shouldReduceMotion ? { scale: 0.99 } : undefined}
-                className="surface-card p-8 sm:p-10 flex flex-col justify-between border-rose-500/20 hover:border-rose-500/40 transition-colors group h-full cursor-pointer"
+                className="surface-card p-8 sm:p-10 flex flex-col justify-between border-rose-500/20 hover:border-rose-500/40 transition-colors group h-full"
               >
                 <div>
                   <div className="w-12 h-12 rounded-2xl bg-rose-500/10 text-rose-400 flex items-center justify-center mb-8 border border-rose-500/20 group-hover:scale-105 transition-transform">
@@ -270,14 +361,15 @@ const Home: React.FC = () => {
                     03 &bull; GIVE BACK
                   </span>
                   <h3 className="text-2xl font-display font-bold text-white mb-3">
-                    Every round can create impact.
+                    Guaranteed Impact Choice
                   </h3>
-                  <p className="text-sm text-on-surface-variant leading-relaxed font-sans">
-                    Choose a charity you care about and decide how much of your subscription contribution goes toward their work. Start at 10% or increase up to 100%.
+                  <p className="text-sm text-on-surface-variant leading-relaxed font-sans mb-6">
+                    Choose from verified charity partners including Macmillan Cancer Support, British Heart Foundation, and WWF UK. Direct a guaranteed 10% or increase up to 100% of your subscription anytime.
                   </p>
                 </div>
-                <div className="pt-6 mt-8 border-t border-white/[0.06] flex items-center gap-2 text-xs font-semibold text-rose-400">
-                  <span>Direct partner allocation guaranteed</span>
+                <div className="pt-6 border-t border-white/[0.06] flex items-center justify-between text-xs">
+                  <span className="text-on-surface-variant">Allocation:</span>
+                  <span className="font-semibold text-rose-400">10% to 100% Discretionary</span>
                 </div>
               </motion.div>
             </StaggerItem>
@@ -292,13 +384,13 @@ const Home: React.FC = () => {
         <div className="max-w-7xl mx-auto">
           <FadeSlide direction="up" delay={0.05} className="max-w-3xl mb-12">
             <Badge variant="lime" size="md" className="mb-4">
-              See How It Works
+              Interactive Demonstration
             </Badge>
             <h2 className="text-3xl sm:text-4xl md:text-5xl font-display font-bold tracking-tight text-white mb-4">
-              Try the score-to-draw journey.
+              See how your rounds qualify.
             </h2>
             <p className="text-base sm:text-lg text-on-surface-variant">
-              Interact with the demo below to see how five rounds become qualifying numbers and how your subscription funds both cash prizes and charity.
+              Interact with the educational simulator below to see how five rounds become qualifying numbers and how your contribution funds both cash prizes and charity.
             </p>
           </FadeSlide>
 
@@ -309,108 +401,157 @@ const Home: React.FC = () => {
       </section>
 
       {/* ============================================================ */}
-      {/* 4. THE MONTHLY DRAW & TIERS */}
+      {/* 4. TRANSPARENT ECONOMICS & PLANS */}
       {/* ============================================================ */}
       <section className="py-24 px-6 md:px-12 bg-[#090C12] border-t border-white/[0.06] relative">
         <div className="max-w-7xl mx-auto">
-          <FadeSlide direction="up" delay={0.05} className="flex flex-col lg:flex-row lg:items-end justify-between gap-8 mb-16">
-            <div className="max-w-2xl">
-              <Badge variant="gold" size="md" className="mb-4">
-                Transparent Prize Allocation
-              </Badge>
-              <h2 className="text-3xl sm:text-4xl md:text-5xl font-display font-bold tracking-tight text-white mb-4">
-                Three ways to win each month.
-              </h2>
-              <p className="text-base sm:text-lg text-on-surface-variant">
-                50% of community subscription fees directly fund the monthly prize pool. Match your active scores to win your equal share of the tier pool.
-              </p>
-            </div>
-            <Link to="/how-it-works">
-              <Button variant="outline" size="sm" icon={<HelpCircle className="w-4 h-4" />}>
-                Detailed Draw Rules
-              </Button>
-            </Link>
+          <FadeSlide direction="up" delay={0.05} className="max-w-3xl mb-16">
+            <Badge variant="lime" size="md" className="mb-4">
+              Transparent Economics
+            </Badge>
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-display font-bold tracking-tight text-white mb-4">
+              Where your subscription goes.
+            </h2>
+            <p className="text-base sm:text-lg text-on-surface-variant">
+              No hidden fees, no opaque algorithms. Every rupee of subscriber revenue follows strict, provable allocations.
+            </p>
           </FadeSlide>
 
-          <StaggerContainer staggerDelay={0.1} className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* 5-Match Tier */}
-            <StaggerItem>
-              <motion.div 
-                whileHover={!shouldReduceMotion ? { y: -4, transition: { duration: 0.15 } } : undefined}
-                className="surface-editorial p-8 border-amber-500/30 flex flex-col justify-between h-full"
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-6">
-                    <Badge variant="tier5" size="md">5 of 5 Match</Badge>
-                    <span className="text-xs font-mono font-bold text-amber-400 uppercase">Jackpot</span>
-                  </div>
-                  <div className="mb-4">
-                    <span className="font-display text-5xl font-black text-white">40%</span>
-                    <span className="text-xs text-on-surface-variant ml-2 uppercase tracking-wider font-mono">of Prize Pool</span>
-                  </div>
-                  <p className="text-sm text-on-surface-variant leading-relaxed mb-6 font-sans">
-                    Match all 5 of your qualifying Stableford scores against the 5 winning numbers drawn. If unclaimed, the entire 40% rolls over to next month's jackpot.
-                  </p>
+          {/* Allocation Split Row */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
+            <div className="surface-card p-8 border-emerald-500/30 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-xs font-mono font-bold text-emerald-400 uppercase">Prize Fund</span>
+                  <Trophy className="w-5 h-5 text-emerald-400" />
                 </div>
-                <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300 font-medium flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4 flex-shrink-0" />
-                  <span>Jackpot carries forward if unclaimed</span>
-                </div>
-              </motion.div>
-            </StaggerItem>
+                <div className="text-4xl font-display font-black text-white mb-2">50%</div>
+                <h4 className="text-lg font-bold text-white mb-2">Monthly Member Prize Pool</h4>
+                <p className="text-xs text-on-surface-variant leading-relaxed">
+                  Half of all subscriber revenue is pooled and distributed directly to qualifying winners across 3 prize tiers each month.
+                </p>
+              </div>
+              <div className="pt-4 mt-6 border-t border-white/[0.06] text-xs font-semibold text-emerald-400">
+                Independent Draw Verification
+              </div>
+            </div>
 
-            {/* 4-Match Tier */}
-            <StaggerItem>
-              <motion.div 
-                whileHover={!shouldReduceMotion ? { y: -4, transition: { duration: 0.15 } } : undefined}
-                className="surface-card p-8 border-emerald-500/20 flex flex-col justify-between h-full"
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-6">
-                    <Badge variant="tier4" size="md">4 of 5 Match</Badge>
-                    <span className="text-xs font-mono font-bold text-emerald-400 uppercase">Tier 2</span>
-                  </div>
-                  <div className="mb-4">
-                    <span className="font-display text-5xl font-black text-white">35%</span>
-                    <span className="text-xs text-on-surface-variant ml-2 uppercase tracking-wider font-mono">of Prize Pool</span>
-                  </div>
-                  <p className="text-sm text-on-surface-variant leading-relaxed mb-6 font-sans">
-                    Match 4 of your qualifying scores. Split equally among all qualifying players who achieve 4 matches in the monthly draw cycle.
-                  </p>
+            <div className="surface-card p-8 border-rose-500/30 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-xs font-mono font-bold text-rose-400 uppercase">Charity Partner</span>
+                  <Heart className="w-5 h-5 text-rose-400 fill-rose-400/30" />
                 </div>
-                <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.08] text-xs text-on-surface-variant font-medium flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                  <span>Equal split among tier winners</span>
-                </div>
-              </motion.div>
-            </StaggerItem>
+                <div className="text-4xl font-display font-black text-white mb-2">10%–100%</div>
+                <h4 className="text-lg font-bold text-white mb-2">Guaranteed Direct Donation</h4>
+                <p className="text-xs text-on-surface-variant leading-relaxed">
+                  A minimum 10% is guaranteed to your chosen partner. You can adjust your donation percentage anytime in your member dashboard.
+                </p>
+              </div>
+              <div className="pt-4 mt-6 border-t border-white/[0.06] text-xs font-semibold text-rose-400">
+                Audited Donation Statements
+              </div>
+            </div>
 
-            {/* 3-Match Tier */}
-            <StaggerItem>
-              <motion.div 
-                whileHover={!shouldReduceMotion ? { y: -4, transition: { duration: 0.15 } } : undefined}
-                className="surface-card p-8 border-teal-500/20 flex flex-col justify-between h-full"
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-6">
-                    <Badge variant="tier3" size="md">3 of 5 Match</Badge>
-                    <span className="text-xs font-mono font-bold text-teal-400 uppercase">Tier 3</span>
-                  </div>
-                  <div className="mb-4">
-                    <span className="font-display text-5xl font-black text-white">25%</span>
-                    <span className="text-xs text-on-surface-variant ml-2 uppercase tracking-wider font-mono">of Prize Pool</span>
-                  </div>
-                  <p className="text-sm text-on-surface-variant leading-relaxed mb-6 font-sans">
-                    Match 3 of your qualifying scores. The most accessible tier, rewarding consistent solid play across your regular golf rounds.
-                  </p>
+            <div className="surface-card p-8 border-white/10 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-xs font-mono font-bold text-white/60 uppercase">Platform & Ops</span>
+                  <ShieldCheck className="w-5 h-5 text-white/60" />
                 </div>
-                <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.08] text-xs text-on-surface-variant font-medium flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-teal-400 flex-shrink-0" />
-                  <span>Equal split among tier winners</span>
+                <div className="text-4xl font-display font-black text-white mb-2">Balance</div>
+                <h4 className="text-lg font-bold text-white mb-2">Operations & Infrastructure</h4>
+                <p className="text-xs text-on-surface-variant leading-relaxed">
+                  Funds secure cloud infrastructure, payment gateway processing, charity partner compliance, and real-time score verification.
+                </p>
+              </div>
+              <div className="pt-4 mt-6 border-t border-white/[0.06] text-xs font-semibold text-white/60">
+                PCI-DSS Bank Grade Security
+              </div>
+            </div>
+          </div>
+
+          {/* Pricing Comparison Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+            {/* Monthly Card */}
+            <div className="surface-card p-8 sm:p-10 border-white/15 flex flex-col justify-between">
+              <div>
+                <span className="text-xs font-mono font-bold uppercase tracking-wider text-on-surface-variant">Monthly Plan</span>
+                <div className="flex items-baseline gap-2 my-4">
+                  <span className="text-4xl sm:text-5xl font-display font-black text-white">₹499</span>
+                  <span className="text-sm text-on-surface-variant font-medium">/ month</span>
                 </div>
-              </motion.div>
-            </StaggerItem>
-          </StaggerContainer>
+                <p className="text-xs text-on-surface-variant mb-6">
+                  Flexible monthly membership. Enter all draws, change your charity partner anytime, and cancel with one click.
+                </p>
+                <ul className="space-y-3 text-xs text-on-surface-variant mb-8">
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                    <span>Eligible for all 12 monthly community draws</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                    <span>Retains 5 active Stableford scores (1–45 pts)</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                    <span>Guaranteed 10% to 100% charity allocation</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                    <span>Instant self-service cancellation anytime</span>
+                  </li>
+                </ul>
+              </div>
+              <Link to="/signup">
+                <Button variant="outline" size="md" className="w-full">
+                  Choose Monthly
+                </Button>
+              </Link>
+            </div>
+
+            {/* Annual Card */}
+            <div className="surface-editorial p-8 sm:p-10 border-emerald-500/40 relative overflow-hidden flex flex-col justify-between">
+              <div className="absolute top-4 right-4">
+                <span className="px-3 py-1 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-[#CCFF00] text-[#08090D]">
+                  Save ~17% (2 Months Free)
+                </span>
+              </div>
+              <div>
+                <span className="text-xs font-mono font-bold uppercase tracking-wider text-emerald-400">Annual Plan</span>
+                <div className="flex items-baseline gap-2 my-4">
+                  <span className="text-4xl sm:text-5xl font-display font-black text-white">₹4,999</span>
+                  <span className="text-sm text-on-surface-variant font-medium">/ year</span>
+                </div>
+                <p className="text-xs text-on-surface-variant mb-6">
+                  Best value. Full 12-month membership for the price of 10 months, maximizing your long-term charity contribution.
+                </p>
+                <ul className="space-y-3 text-xs text-on-surface-variant mb-8">
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-[#CCFF00] flex-shrink-0" />
+                    <span>Full year coverage &bull; 12 consecutive draw cycles</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-[#CCFF00] flex-shrink-0" />
+                    <span>Continuous rollover jackpot eligibility</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-[#CCFF00] flex-shrink-0" />
+                    <span>Direct charity impact amplified all year</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-[#CCFF00] flex-shrink-0" />
+                    <span>2 Months Free compared to monthly billing</span>
+                  </li>
+                </ul>
+              </div>
+              <Link to="/signup">
+                <Button variant="lime" size="md" className="w-full" icon={<ArrowRight className="w-4 h-4 text-[#08090D]" />}>
+                  Choose Annual
+                </Button>
+              </Link>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -430,7 +571,7 @@ const Home: React.FC = () => {
                 Featured Charities
               </h2>
               <p className="text-base text-on-surface-variant">
-                Select from verified partner organizations doing vital work across communities.
+                Select from verified partner organizations doing vital work across health, community, and the environment.
               </p>
             </div>
             <Link to="/charities">
@@ -445,7 +586,7 @@ const Home: React.FC = () => {
               <StaggerItem key={charity.id}>
                 <motion.div
                   whileHover={!shouldReduceMotion ? { y: -6, transition: { duration: 0.18 } } : undefined}
-                  className="surface-card overflow-hidden flex flex-col justify-between group transition-colors hover:border-white/20 h-full"
+                  className="surface-card overflow-hidden flex flex-col justify-between group transition-colors hover:border-white/20 h-full rounded-2xl"
                 >
                   <div>
                     <div className="h-44 bg-slate-900 relative overflow-hidden">
@@ -499,7 +640,48 @@ const Home: React.FC = () => {
       </section>
 
       {/* ============================================================ */}
-      {/* 6. FINAL CTA SECTION */}
+      {/* 6. PLATFORM TRUST & INTEGRITY */}
+      {/* ============================================================ */}
+      <section className="py-20 px-6 md:px-12 bg-[#080B10] border-t border-white/[0.06] relative">
+        <div className="max-w-7xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div className="p-6 rounded-2xl bg-white/[0.02] border border-white/[0.06]">
+              <Lock className="w-6 h-6 text-emerald-400 mb-3" />
+              <h4 className="font-display font-bold text-white text-sm mb-1">Row-Level Security</h4>
+              <p className="text-xs text-on-surface-variant leading-relaxed">
+                Supabase database isolation guarantees that member data, scores, and charity allocations remain strictly private.
+              </p>
+            </div>
+
+            <div className="p-6 rounded-2xl bg-white/[0.02] border border-white/[0.06]">
+              <Award className="w-6 h-6 text-amber-400 mb-3" />
+              <h4 className="font-display font-bold text-white text-sm mb-1">Audited Draw Proofs</h4>
+              <p className="text-xs text-on-surface-variant leading-relaxed">
+                Draw executions publish cryptographic winner verification proofs stored in tamper-proof public storage.
+              </p>
+            </div>
+
+            <div className="p-6 rounded-2xl bg-white/[0.02] border border-white/[0.06]">
+              <Zap className="w-6 h-6 text-[#CCFF00] mb-3" />
+              <h4 className="font-display font-bold text-white text-sm mb-1">Instant Cancellation</h4>
+              <p className="text-xs text-on-surface-variant leading-relaxed">
+                Self-service subscription management in your dashboard. Cancel anytime with zero lock-in or penalties.
+              </p>
+            </div>
+
+            <div className="p-6 rounded-2xl bg-white/[0.02] border border-white/[0.06]">
+              <Target className="w-6 h-6 text-teal-400 mb-3" />
+              <h4 className="font-display font-bold text-white text-sm mb-1">Stableford Standard</h4>
+              <p className="text-xs text-on-surface-variant leading-relaxed">
+                Scores follow standard 1–45 point constraints with single round per date validation to preserve fair play.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ============================================================ */}
+      {/* 7. FINAL HIGH-IMPACT CALL TO ACTION */}
       {/* ============================================================ */}
       <section className="py-24 px-6 md:px-12 relative overflow-hidden border-t border-white/[0.08] bg-[#07090E]">
         <AbstractGraphic variant="hero-mesh" glowColor="lime" className="opacity-30" />
@@ -508,11 +690,11 @@ const Home: React.FC = () => {
           <Badge variant="lime" size="md" className="mb-6">
             Join the Community
           </Badge>
-          <h2 className="text-4xl sm:text-5xl md:text-6xl font-display font-extrabold tracking-tight text-white mb-6 leading-tight">
-            Play for something bigger.
+          <h2 className="text-4xl sm:text-5xl md:text-6xl font-display font-black tracking-tight text-white mb-6 leading-tight">
+            Ready to make your rounds count?
           </h2>
           <p className="text-lg md:text-xl text-on-surface-variant max-w-2xl mx-auto mb-10 leading-relaxed">
-            Your game. Your chance. Your impact.
+            Choose your charity partner, submit your latest rounds, and join the monthly community draw today.
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -523,13 +705,13 @@ const Home: React.FC = () => {
             </Link>
             <Link to="/how-it-works">
               <Button variant="outline" size="lg">
-                Explore Mechanics
+                Explore Detailed Rules
               </Button>
             </Link>
           </div>
 
           <p className="text-xs text-on-surface-variant/70 mt-8">
-            Monthly and annual plans available &bull; Transparent draw rules &bull; Cancel anytime
+            Monthly ₹499 &bull; Annual ₹4,999 (2 Months Free) &bull; Cancel anytime via dashboard
           </p>
         </FadeSlide>
       </section>

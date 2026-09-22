@@ -44,6 +44,14 @@ const DashboardOverview: React.FC = () => {
 
   const fetchData = async () => {
     setLoading(true);
+    let isCancelled = false;
+
+    const watchdog = setTimeout(() => {
+      if (!isCancelled) {
+        setLoading(false);
+      }
+    }, 6000);
+
     try {
       // 1. Fetch scores
       const { data: scoreData } = await supabase
@@ -53,14 +61,14 @@ const DashboardOverview: React.FC = () => {
         .order('date', { ascending: false })
         .limit(5);
       
-      setScores(scoreData || []);
+      if (!isCancelled) setScores(scoreData || []);
 
       // 2. Fetch charities
       const { data: charityData } = await supabase
         .from('charities')
         .select('*');
       
-      setCharities(charityData || []);
+      if (!isCancelled) setCharities(charityData || []);
 
       // 3. Fetch latest published draw
       const { data: drawData } = await supabase
@@ -71,17 +79,17 @@ const DashboardOverview: React.FC = () => {
         .limit(1)
         .maybeSingle();
       
-      setLatestDraw(drawData);
+      if (!isCancelled) setLatestDraw(drawData);
 
       // 4. Fetch user's entry for this draw
-      if (drawData) {
+      if (drawData && user?.id) {
         const { data: entryData } = await supabase
           .from('draw_entries')
           .select('*')
           .eq('draw_id', drawData.id)
-          .eq('user_id', user?.id)
+          .eq('user_id', user.id)
           .maybeSingle();
-        setLatestEntry(entryData);
+        if (!isCancelled) setLatestEntry(entryData);
       }
 
       // 5. Fetch featured charities for discovery
@@ -90,11 +98,14 @@ const DashboardOverview: React.FC = () => {
         .select('*')
         .eq('featured', true)
         .limit(3);
-      setFeaturedCharities(featuredData || []);
+      if (!isCancelled) setFeaturedCharities(featuredData || []);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
     } finally {
-      setLoading(false);
+      clearTimeout(watchdog);
+      if (!isCancelled) {
+        setLoading(false);
+      }
     }
   };
 
@@ -176,10 +187,11 @@ const DashboardOverview: React.FC = () => {
 
   const activeCharity = charities.find(c => c.id === (subscription?.charity_id || profile?.selected_charity_id));
 
-  if (loading || subLoading) {
+  if (loading && subLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen flex flex-col items-center justify-center bg-background text-primary gap-4">
+        <div className="w-10 h-10 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Loading your Golf For Good...</p>
       </div>
     );
   }
@@ -197,6 +209,26 @@ const DashboardOverview: React.FC = () => {
       <AbstractGraphic variant="ambient-glow" className="opacity-40" />
 
       <div className="max-w-7xl mx-auto px-6 py-10 relative z-10 space-y-10">
+        {/* Incomplete Onboarding Prompt Banner */}
+        {profile && !profile.onboarding_completed && (
+          <div className="p-6 rounded-2xl bg-amber-500/10 border border-amber-500/25 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+              <div>
+                <h3 className="text-sm font-bold text-white">Account Setup Incomplete</h3>
+                <p className="text-xs text-on-surface-variant mt-1 leading-relaxed">
+                  Choose your charity partner and membership tier to activate your eligibility in monthly community prize draws.
+                </p>
+              </div>
+            </div>
+            <Link to="/onboarding" className="shrink-0">
+              <button className="px-5 py-2.5 rounded-xl bg-amber-400 text-slate-950 font-semibold text-xs hover:bg-amber-300 transition-colors shadow-md">
+                Continue Setup &rarr;
+              </button>
+            </Link>
+          </div>
+        )}
+
         {/* Welcome Header */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-8 border-b border-white/10">
           <div>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { Search, Heart, ArrowRight, Check, Sparkles, Globe } from 'lucide-react';
+import { Search, Heart, ArrowRight, Check, Sparkles, Globe, AlertCircle, RotateCcw } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { cn, formatCurrency } from '../lib/utils';
 import { useAuth } from '../components/auth/AuthProvider';
@@ -15,6 +15,7 @@ const Charities: React.FC = () => {
   const { user, profile, refreshProfile } = useAuth();
   const [charities, setCharities] = useState<Charity[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectingId, setSelectingId] = useState<string | null>(null);
@@ -25,18 +26,36 @@ const Charities: React.FC = () => {
 
   const fetchCharities = async () => {
     setLoading(true);
+    setError(null);
+    let isCancelled = false;
+
+    // Safety watchdog: never leave spinner running longer than 6 seconds
+    const watchdog = setTimeout(() => {
+      if (!isCancelled) {
+        setLoading(false);
+      }
+    }, 6000);
+
     try {
-      const { data, error } = await supabase
+      const { data, error: queryError } = await supabase
         .from('charities')
         .select('*')
         .order('total_raised', { ascending: false });
       
-      if (error) throw error;
-      setCharities(data || []);
-    } catch (error) {
-      console.error('Error fetching charities:', error);
+      if (queryError) throw queryError;
+      if (!isCancelled) {
+        setCharities(data || []);
+      }
+    } catch (err: any) {
+      console.error('Error fetching charities:', err);
+      if (!isCancelled) {
+        setError(err.message || 'We could not connect to the charity registry.');
+      }
     } finally {
-      setLoading(false);
+      clearTimeout(watchdog);
+      if (!isCancelled) {
+        setLoading(false);
+      }
     }
   };
 
@@ -123,16 +142,34 @@ const Charities: React.FC = () => {
           </div>
         </div>
 
-        {/* Charities Grid */}
+        {/* Charities Grid & States */}
         {loading ? (
-          <div className="flex items-center justify-center py-28">
-            <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          <div className="flex flex-col items-center justify-center py-28 gap-4">
+            <div className="w-10 h-10 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Finding your impact partners...</p>
+          </div>
+        ) : error ? (
+          <div className="surface-card p-16 text-center max-w-lg mx-auto border border-rose-500/20">
+            <AlertCircle className="w-12 h-12 text-rose-400 mx-auto mb-4" />
+            <h3 className="text-lg font-bold text-white mb-2">We couldn't load charities</h3>
+            <p className="text-xs text-on-surface-variant mb-6">{error}</p>
+            <Button variant="outline" size="sm" icon={<RotateCcw className="w-3.5 h-3.5" />} onClick={fetchCharities}>
+              Try Again
+            </Button>
           </div>
         ) : filteredCharities.length === 0 ? (
           <div className="surface-card p-16 text-center max-w-lg mx-auto">
             <Heart className="w-12 h-12 text-on-surface-variant/40 mx-auto mb-4" />
-            <h3 className="text-lg font-bold text-white mb-2">No charities found</h3>
-            <p className="text-xs text-on-surface-variant">Try searching for a different name or resetting the category filter.</p>
+            <h3 className="text-lg font-bold text-white mb-2">No charities match that search</h3>
+            <p className="text-xs text-on-surface-variant mb-6">Try searching for a different name or cause, or clear your filters.</p>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              icon={<RotateCcw className="w-3.5 h-3.5" />}
+              onClick={() => { setSearchTerm(''); setSelectedCategory('All'); }}
+            >
+              Reset Search
+            </Button>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">

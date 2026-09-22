@@ -18,28 +18,104 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check active sessions and subscribe to auth changes
+    let isMounted = true;
+
+    // Safety watchdog: Auth initialization must never block the app longer than 5 seconds
+    const watchdog = setTimeout(() => {
+      if (isMounted) {
+        setLoading((prev) => {
+          if (prev) {
+            console.warn('Auth initialization reached safety watchdog; releasing loading lock.');
+            return false;
+          }
+          return prev;
+        });
+      }
+    }, 5000);
+
+    // Track active profile fetch to avoid duplicate concurrent calls
+    let activeFetchUserId: string | null = null;
+
+    const fetchProfile = async (userId: string, currentUser?: any) => {
+      if (activeFetchUserId === userId) return;
+      activeFetchUserId = userId;
+
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', userId)
+          .maybeSingle();
+
+        if (error) {
+          console.error('Error fetching profile:', error);
+        }
+
+        if (isMounted) {
+          if (data) {
+            setProfile(data);
+          } else {
+            // Self-heal: If profile row is missing for an authenticated user, provision initial profile
+            const userObj = currentUser || user;
+            const newProfile = {
+              id: userId,
+              full_name: userObj?.user_metadata?.full_name || userObj?.email?.split('@')[0] || 'Member',
+              email: userObj?.email || '',
+              role: 'user' as const,
+              onboarding_completed: false,
+            };
+
+            const { data: created, error: insertError } = await supabase
+              .from('profiles')
+              .upsert(newProfile)
+              .select()
+              .maybeSingle();
+
+            if (!insertError && created) {
+              setProfile(created);
+            } else {
+              setProfile(newProfile as any);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error in profile resolution:', error);
+      } finally {
+        activeFetchUserId = null;
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    // Check active session
     const initAuth = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
+        if (!isMounted) return;
+
         if (session?.user) {
           setUser(session.user as any);
-          await fetchProfile(session.user.id);
+          await fetchProfile(session.user.id, session.user);
         } else {
           setLoading(false);
         }
       } catch (error) {
         console.error('Error initializing auth:', error);
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
     initAuth();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (!isMounted) return;
+
       if (session?.user) {
         setUser(session.user as any);
-        await fetchProfile(session.user.id);
+        await fetchProfile(session.user.id, session.user);
       } else {
         setUser(null);
         setProfile(null);
@@ -47,40 +123,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      isMounted = false;
+      clearTimeout(watchdog);
+      subscription.unsubscribe();
+    };
   }, []);
 
-  const fetchProfile = async (userId: string) => {
+  const signOut = async () => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
-
-      if (error) {
-        if (error.code === 'PGRST116') {
-          // Profile not found, this might happen if signup profile creation failed
-          // We'll handle this in the signup flow, but as a fallback we could create it here
-          console.warn('Profile not found for user:', userId);
-        } else {
-          throw error;
-        }
-      }
-      setProfile(data);
-    } catch (error) {
-      console.error('Error fetching profile:', error);
+      await supabase.auth.signOut();
+    } catch (e) {
+      console.error('Sign out error:', e);
     } finally {
-      setLoading(false);
+      setUser(null);
+      setProfile(null);
     }
   };
 
-  const signOut = async () => {
-    await supabase.auth.signOut();
-  };
-
   const refreshProfile = async () => {
-    if (user?.id) await fetchProfile(user.id);
+    if (user?.id) {
+      try {
+        const { data } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .maybeSingle();
+        if (data) setProfile(data);
+      } catch (e) {
+        console.error('Error refreshing profile:', e);
+      }
+    }
   };
 
   return (

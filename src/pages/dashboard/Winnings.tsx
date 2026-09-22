@@ -26,6 +26,15 @@ const Winnings: React.FC = () => {
   }, [user]);
 
   const fetchEntries = async () => {
+    setLoading(true);
+    let isCancelled = false;
+
+    const watchdog = setTimeout(() => {
+      if (!isCancelled) {
+        setLoading(false);
+      }
+    }, 6000);
+
     try {
       const { data, error } = await supabase
         .from('draw_entries')
@@ -34,18 +43,21 @@ const Winnings: React.FC = () => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setEntries(data || []);
+      if (!isCancelled) setEntries(data || []);
     } catch (err) {
       console.error('Error fetching winnings:', err);
     } finally {
-      setLoading(false);
+      clearTimeout(watchdog);
+      if (!isCancelled) {
+        setLoading(false);
+      }
     }
   };
 
   const wonEntries = entries.filter(e => e.prize_amount > 0);
   const pendingProofsCount = wonEntries.filter(e => e.winner_status === 'pending').length;
 
-  if (loading || subLoading) {
+  if (loading && subLoading) {
     return (
       <div className="flex items-center justify-center min-h-[500px]">
         <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />

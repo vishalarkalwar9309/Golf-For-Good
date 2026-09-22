@@ -47,14 +47,26 @@ const CharitySelection: React.FC = () => {
   }, [subscription, profile]);
 
   const fetchCharities = async () => {
+    setLoading(true);
+    let isCancelled = false;
+
+    const watchdog = setTimeout(() => {
+      if (!isCancelled) {
+        setLoading(false);
+      }
+    }, 6000);
+
     try {
       const { data, error } = await supabase.from('charities').select('*').order('name');
       if (error) throw error;
-      setCharities(data || []);
+      if (!isCancelled) setCharities(data || []);
     } catch (err) {
       console.error('Error fetching charities:', err);
     } finally {
-      setLoading(false);
+      clearTimeout(watchdog);
+      if (!isCancelled) {
+        setLoading(false);
+      }
     }
   };
 
@@ -89,21 +101,26 @@ const CharitySelection: React.FC = () => {
       setMessage({ type: 'error', text: 'An active membership is required to save contribution preferences.' });
       return;
     }
+
+    if (!selectedCharityId) {
+      setMessage({ type: 'error', text: 'Please select a charity partner.' });
+      return;
+    }
+
     setSaving(true);
     setMessage(null);
     try {
-      if (!selectedCharityId) throw new Error('Please select a charity first.');
       await updateCharityDetails(selectedCharityId, contributionPct);
-      setMessage({ type: 'success', text: 'Contribution percentage updated successfully.' });
+      await refreshProfile();
+      setMessage({ type: 'success', text: 'Charity preferences updated successfully.' });
     } catch (err: any) {
-      console.error('Save error:', err);
       setMessage({ type: 'error', text: err.message || 'Failed to save preferences.' });
     } finally {
       setSaving(false);
     }
   };
 
-  if (loading || subLoading) {
+  if (loading && subLoading) {
     return (
       <div className="flex items-center justify-center min-h-[500px]">
         <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />

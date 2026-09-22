@@ -10,8 +10,22 @@ export const useSubscription = () => {
   const [error, setError] = useState<string | null>(null);
 
   const fetchSubscription = async () => {
-    if (!user) return;
+    if (!user) {
+      setSubscription(null);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
+    let isCancelled = false;
+
+    // Safety timeout: Never hang in loading state longer than 6 seconds
+    const watchdog = setTimeout(() => {
+      if (!isCancelled) {
+        setLoading(false);
+      }
+    }, 6000);
+
     try {
       const { data, error: subError } = await supabase
         .from('subscriptions')
@@ -20,12 +34,20 @@ export const useSubscription = () => {
         .maybeSingle();
 
       if (subError) throw subError;
-      setSubscription(data);
+      if (!isCancelled) {
+        setSubscription(data);
+        setError(null);
+      }
     } catch (err: any) {
       console.error('Error fetching subscription:', err);
-      setError(err.message);
+      if (!isCancelled) {
+        setError(err.message);
+      }
     } finally {
-      setLoading(false);
+      clearTimeout(watchdog);
+      if (!isCancelled) {
+        setLoading(false);
+      }
     }
   };
 
