@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { Search, Heart, ArrowRight, Check, Sparkles, Globe, AlertCircle, RotateCcw } from 'lucide-react';
@@ -8,67 +8,62 @@ import { useAuth } from '../components/auth/AuthProvider';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
+import { CharityCardSkeleton } from '../components/ui/Skeleton';
+import { 
+  fetchCharities as fetchCharitiesService, 
+  getCachedCharities, 
+  invalidateCharityData 
+} from '../services/dataService';
 import type { Charity } from '../types';
 
 const Charities: React.FC = () => {
   usePageTitle('Charity Directory');
   const { user, profile, refreshProfile } = useAuth();
-  const [charities, setCharities] = useState<Charity[]>([]);
-  const [loading, setLoading] = useState(true);
+  
+  // Instant cache initialization (0ms on return visit)
+  const [charities, setCharities] = useState<Charity[]>(() => getCachedCharities() || []);
+  const [loading, setLoading] = useState<boolean>(() => !getCachedCharities());
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectingId, setSelectingId] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchCharities();
-  }, []);
-
-  const fetchCharities = async () => {
-    setLoading(true);
+  const loadCharities = useCallback(async (force = false) => {
+    // Only show loading skeletons if we don't have any cached data
+    if (!getCachedCharities() || force) {
+      setLoading(true);
+    }
     setError(null);
-    let isCancelled = false;
-
-    // Safety watchdog: never leave spinner running longer than 6 seconds
-    const watchdog = setTimeout(() => {
-      if (!isCancelled) {
-        setLoading(false);
-      }
-    }, 6000);
 
     try {
-      const { data, error: queryError } = await supabase
-        .from('charities')
-        .select('*')
-        .order('total_raised', { ascending: false });
-      
-      if (queryError) throw queryError;
-      if (!isCancelled) {
-        setCharities(data || []);
-      }
+      const data = await fetchCharitiesService(force);
+      setCharities(data);
+      setError(null);
     } catch (err: any) {
-      console.error('Error fetching charities:', err);
-      if (!isCancelled) {
+      console.error('Error loading charities:', err);
+      // If we don't already have cached data to show, display the error
+      if (charities.length === 0) {
         setError(err.message || 'We could not connect to the charity registry.');
       }
     } finally {
-      clearTimeout(watchdog);
-      if (!isCancelled) {
-        setLoading(false);
-      }
+      setLoading(false);
     }
-  };
+  }, [charities.length]);
+
+  useEffect(() => {
+    loadCharities();
+  }, [loadCharities]);
 
   const handleSelectCharity = async (charityId: string) => {
     if (!user) return;
     setSelectingId(charityId);
     try {
-      const { error } = await supabase
+      const { error: profileErr } = await supabase
         .from('profiles')
         .update({ selected_charity_id: charityId })
         .eq('id', user.id);
       
-      if (error) throw error;
+      if (profileErr) throw profileErr;
 
       // Also update active subscription if present
       await supabase
@@ -76,9 +71,10 @@ const Charities: React.FC = () => {
         .update({ charity_id: charityId })
         .eq('user_id', user.id);
 
+      invalidateCharityData();
       await refreshProfile();
-    } catch (error) {
-      console.error('Error selecting charity:', error);
+    } catch (err) {
+      console.error('Error selecting charity:', err);
     } finally {
       setSelectingId(null);
     }
@@ -96,7 +92,7 @@ const Charities: React.FC = () => {
   return (
     <div className="min-h-screen bg-background text-on-surface pt-28 pb-24 px-6 md:px-12">
       <div className="max-w-7xl mx-auto">
-        {/* Header Section */}
+        {/* Header Section (Always immediately rendered) */}
         <div className="text-center max-w-3xl mx-auto mb-16">
           <Badge variant="coral" size="md" className="mb-4">
             Direct Philanthropic Support
@@ -109,7 +105,7 @@ const Charities: React.FC = () => {
           </p>
         </div>
 
-        {/* Search & Category Filter Bar */}
+        {/* Search & Category Filter Bar (Always immediately rendered) */}
         <div className="flex flex-col md:flex-row items-center justify-between gap-6 mb-12">
           {/* Search Box */}
           <div className="relative w-full md:max-w-md">
@@ -142,36 +138,65 @@ const Charities: React.FC = () => {
           </div>
         </div>
 
-        {/* Charities Grid & States */}
-        {loading ? (
-          <div className="flex flex-col items-center justify-center py-28 gap-4">
-            <div className="w-10 h-10 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Finding your impact partners...</p>
+        {/* Charities Grid & Progressive States */}
+        {loading && charities.length === 0 ? (
+          // Progressive Skeleton Grid (Never a blank black screen)
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {Array.from({ length: 6 }).map((_, idx) => (
+              <CharityCardSkeleton key={idx} />
+            ))}
           </div>
-        ) : error ? (
+        ) : error && charities.length === 0 ? (
+          // Error State with Retry
           <div className="surface-card p-16 text-center max-w-lg mx-auto border border-rose-500/20">
             <AlertCircle className="w-12 h-12 text-rose-400 mx-auto mb-4" />
             <h3 className="text-lg font-bold text-white mb-2">We couldn't load charities</h3>
             <p className="text-xs text-on-surface-variant mb-6">{error}</p>
-            <Button variant="outline" size="sm" icon={<RotateCcw className="w-3.5 h-3.5" />} onClick={fetchCharities}>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              icon={<RotateCcw className="w-3.5 h-3.5" />} 
+              onClick={() => loadCharities(true)}
+            >
               Try Again
             </Button>
           </div>
-        ) : filteredCharities.length === 0 ? (
+        ) : charities.length === 0 ? (
+          // Truly Empty Directory (0 rows in database)
           <div className="surface-card p-16 text-center max-w-lg mx-auto">
             <Heart className="w-12 h-12 text-on-surface-variant/40 mx-auto mb-4" />
-            <h3 className="text-lg font-bold text-white mb-2">No charities match that search</h3>
-            <p className="text-xs text-on-surface-variant mb-6">Try searching for a different name or cause, or clear your filters.</p>
+            <h3 className="text-lg font-bold text-white mb-2">No charities registered yet</h3>
+            <p className="text-xs text-on-surface-variant mb-6">Partner organizations will appear here as they are added.</p>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              icon={<RotateCcw className="w-3.5 h-3.5" />} 
+              onClick={() => loadCharities(true)}
+            >
+              Refresh Directory
+            </Button>
+          </div>
+        ) : filteredCharities.length === 0 ? (
+          // Filter / Search Produced Zero Results
+          <div className="surface-card p-16 text-center max-w-lg mx-auto">
+            <Search className="w-12 h-12 text-on-surface-variant/40 mx-auto mb-4" />
+            <h3 className="text-lg font-bold text-white mb-2">No charities match your search</h3>
+            <p className="text-xs text-on-surface-variant mb-6">
+              {searchTerm 
+                ? `No partner charities matched "${searchTerm}". Try another keyword or clear filters.` 
+                : `No partner charities found in category "${selectedCategory}".`}
+            </p>
             <Button 
               variant="outline" 
               size="sm" 
               icon={<RotateCcw className="w-3.5 h-3.5" />}
               onClick={() => { setSearchTerm(''); setSelectedCategory('All'); }}
             >
-              Reset Search
+              Reset Search & Filters
             </Button>
           </div>
         ) : (
+          // Render Real Charity Cards
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {filteredCharities.map((charity) => {
               const isSelected = profile?.selected_charity_id === charity.id;
@@ -180,7 +205,7 @@ const Charities: React.FC = () => {
                 <div
                   key={charity.id}
                   className={cn(
-                    "surface-card overflow-hidden flex flex-col justify-between transition-all duration-300 hover:border-white/20",
+                    "surface-card overflow-hidden flex flex-col justify-between transition-all duration-300 hover:border-white/20 rounded-2xl",
                     isSelected && "border-emerald-500/40 shadow-lg shadow-emerald-500/5"
                   )}
                 >
@@ -235,21 +260,22 @@ const Charities: React.FC = () => {
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <Link to={`/charities/${charity.slug}`}>
-                        <Button variant="ghost" size="sm">
-                          Details
-                        </Button>
+                      <Link 
+                        to={`/charities/${charity.slug}`}
+                        className="text-xs font-semibold text-on-surface-variant hover:text-white transition-colors px-3 py-1.5 rounded-lg hover:bg-white/5"
+                      >
+                        Details
                       </Link>
 
                       {user && (
                         <Button
-                          variant={isSelected ? "outline" : "primary"}
+                          variant={isSelected ? "lime" : "outline"}
                           size="sm"
-                          loading={selectingId === charity.id}
+                          icon={isSelected ? <Check className="w-3.5 h-3.5 text-[#08090D]" /> : <Heart className="w-3.5 h-3.5 text-rose-400" />}
                           onClick={() => handleSelectCharity(charity.id)}
-                          icon={isSelected ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : undefined}
+                          disabled={selectingId === charity.id || isSelected}
                         >
-                          {isSelected ? "Selected" : "Select"}
+                          {isSelected ? 'Selected' : 'Support'}
                         </Button>
                       )}
                     </div>

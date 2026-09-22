@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Award, CheckCircle2, AlertCircle, Clock, Lock, Target, ArrowRight } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Link } from 'react-router-dom';
@@ -9,6 +9,7 @@ import { cn, formatCurrency, formatDate } from '../../lib/utils';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import EmptyState from '../../components/ui/EmptyState';
 import { AbstractGraphic } from '../../components/ui/AbstractGraphic';
+import { fetchWithCache, getCached } from '../../lib/cache';
 import type { DrawEntry } from '../../types';
 import ProofUpload from '../../components/ui/ProofUpload';
 
@@ -16,54 +17,51 @@ const Winnings: React.FC = () => {
   usePageTitle('My Winnings & Payouts');
   const { user, profile } = useAuth();
   const { isPremium, loading: subLoading } = useSubscription();
-  const [entries, setEntries] = useState<DrawEntry[]>([]);
-  const [loading, setLoading] = useState(true);
+  
+  // Instant cache-first initialization
+  const [entries, setEntries] = useState<DrawEntry[]>(() => 
+    user ? (getCached<DrawEntry[]>(`user:winnings:${user.id}`, user.id) || []) : []
+  );
+  const [loading, setLoading] = useState<boolean>(() => 
+    !user || !getCached(`user:winnings:${user.id}`, user.id)
+  );
 
-  useEffect(() => {
-    if (user) {
-      fetchEntries();
+  const fetchEntries = useCallback(async (force = false) => {
+    if (!user) return;
+    const key = `user:winnings:${user.id}`;
+    if (!getCached(key, user.id) || force) {
+      setLoading(true);
     }
-  }, [user]);
-
-  const fetchEntries = async () => {
-    setLoading(true);
-    let isCancelled = false;
-
-    const watchdog = setTimeout(() => {
-      if (!isCancelled) {
-        setLoading(false);
-      }
-    }, 6000);
 
     try {
-      const { data, error } = await supabase
-        .from('draw_entries')
-        .select('*, draw:draws(*)')
-        .eq('user_id', user?.id)
-        .order('created_at', { ascending: false });
+      const data = await fetchWithCache<DrawEntry[]>(
+        key,
+        async () => {
+          const { data: entriesData, error } = await supabase
+            .from('draw_entries')
+            .select('*, draw:draws(*)')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      if (!isCancelled) setEntries(data || []);
+          if (error) throw error;
+          return entriesData || [];
+        },
+        { ttl: 60000, userId: user.id, forceRefresh: force }
+      );
+      setEntries(data);
     } catch (err) {
       console.error('Error fetching winnings:', err);
     } finally {
-      clearTimeout(watchdog);
-      if (!isCancelled) {
-        setLoading(false);
-      }
+      setLoading(false);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    fetchEntries();
+  }, [fetchEntries]);
 
   const wonEntries = entries.filter(e => e.prize_amount > 0);
   const pendingProofsCount = wonEntries.filter(e => e.winner_status === 'pending').length;
-
-  if (loading && subLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[500px]">
-        <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
 
   return (
     <div className="relative min-h-screen bg-background pb-20">

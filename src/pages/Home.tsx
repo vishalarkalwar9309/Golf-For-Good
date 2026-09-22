@@ -28,25 +28,42 @@ import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { InteractiveScoreStory } from '../components/home/InteractiveScoreStory';
 import { TextReveal, FadeSlide, StaggerContainer, StaggerItem } from '../components/ui/motion';
+import { 
+  fetchCharities as fetchCharitiesService, 
+  getCachedCharities, 
+  fetchLatestPublishedDraw, 
+  getCachedLatestDraw 
+} from '../services/dataService';
 import type { Charity } from '../types';
 import { getLatestRollover } from '../lib/draw';
 
 const Home: React.FC = () => {
   usePageTitle('Your game can do more');
   const shouldReduceMotion = useReducedMotion();
-  const [featuredCharities, setFeaturedCharities] = useState<Charity[]>([]);
+  
+  // Instant cache-first initialization
+  const [featuredCharities, setFeaturedCharities] = useState<Charity[]>(() => {
+    const cached = getCachedCharities() || [];
+    const featured = cached.filter(c => c.featured);
+    return featured.length > 0 ? featured.slice(0, 3) : cached.slice(0, 3);
+  });
   const [latestRollover, setLatestRollover] = useState<number>(0);
-  const [activeDrawMonth, setActiveDrawMonth] = useState<string>('');
-  const [loading, setLoading] = useState(true);
+  const [activeDrawMonth, setActiveDrawMonth] = useState<string>(() => {
+    const cachedDraw = getCachedLatestDraw();
+    if (cachedDraw?.draw_month) return cachedDraw.draw_month;
+    const now = new Date();
+    return now.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+  });
+  const [loading, setLoading] = useState<boolean>(() => !getCachedCharities());
 
   useEffect(() => {
     let isMounted = true;
     const loadHomeData = async () => {
       try {
-        const [rolloverAmount, { data: charitiesData }, { data: latestDrawData }] = await Promise.all([
+        const [rolloverAmount, charitiesData, latestDrawData] = await Promise.all([
           getLatestRollover().catch(() => 0),
-          supabase.from('charities').select('*').limit(6),
-          supabase.from('draws').select('draw_month, status').order('created_at', { ascending: false }).limit(1).maybeSingle()
+          fetchCharitiesService(),
+          fetchLatestPublishedDraw()
         ]);
 
         if (!isMounted) return;
@@ -60,9 +77,6 @@ const Home: React.FC = () => {
 
         if (latestDrawData && (latestDrawData as any).draw_month) {
           setActiveDrawMonth((latestDrawData as any).draw_month);
-        } else {
-          const now = new Date();
-          setActiveDrawMonth(now.toLocaleString('en-US', { month: 'long', year: 'numeric' }));
         }
       } catch (err) {
         console.error('Error loading home data:', err);

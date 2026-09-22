@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -12,6 +12,11 @@ import { cn, formatDate } from '../../lib/utils';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import EmptyState from '../../components/ui/EmptyState';
 import { AbstractGraphic } from '../../components/ui/AbstractGraphic';
+import { 
+  fetchUserScores, 
+  getCachedUserScores, 
+  invalidateScores 
+} from '../../services/dataService';
 import type { Score } from '../../types';
 
 const scoreSchema = z.object({
@@ -26,11 +31,13 @@ const Scores: React.FC = () => {
   usePageTitle('My Scores');
   const { user } = useAuth();
   const { isActive, isPremium, loading: subLoading } = useSubscription();
-  const [scores, setScores] = useState<Score[]>([]);
+  
+  // Instant cache-first initialization
+  const [scores, setScores] = useState<Score[]>(() => user ? (getCachedUserScores(user.id) || []) : []);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [editingScore, setEditingScore] = useState<Score | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState<boolean>(() => !user || !getCachedUserScores(user.id));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -43,44 +50,26 @@ const Scores: React.FC = () => {
     }
   });
 
-  useEffect(() => {
-    if (user) {
-      fetchScores();
+  const fetchScores = useCallback(async (force = false) => {
+    if (!user) return;
+    if (!getCachedUserScores(user.id) || force) {
+      setLoading(true);
+    }
+
+    try {
+      const data = await fetchUserScores(user.id, force);
+      setScores(data);
+      setError(null);
+    } catch (err: any) {
+      setError(err.message || 'Failed to load scores.');
+    } finally {
+      setLoading(false);
     }
   }, [user]);
 
-  const fetchScores = async () => {
-    setLoading(true);
-    let isCancelled = false;
-
-    const watchdog = setTimeout(() => {
-      if (!isCancelled) {
-        setLoading(false);
-      }
-    }, 6000);
-
-    try {
-      const { data, error } = await supabase
-        .from('scores')
-        .select('*')
-        .eq('user_id', user!.id)
-        .order('date', { ascending: false });
-
-      if (error) throw error;
-      if (!isCancelled) {
-        setScores(data || []);
-      }
-    } catch (err: any) {
-      if (!isCancelled) {
-        setError(err.message);
-      }
-    } finally {
-      clearTimeout(watchdog);
-      if (!isCancelled) {
-        setLoading(false);
-      }
-    }
-  };
+  useEffect(() => {
+    fetchScores();
+  }, [fetchScores]);
 
   const startEdit = (score: Score) => {
     setEditingScore(score);
@@ -165,12 +154,13 @@ const Scores: React.FC = () => {
         if (insertError) throw insertError;
       }
 
+      if (user) invalidateScores(user.id);
       reset({
         course_name: '',
         date: new Date().toISOString().split('T')[0],
         stableford_points: '' as any
       });
-      fetchScores();
+      await fetchScores(true);
     } catch (err: any) {
       setError(err.message || 'Failed to submit score');
     } finally {
@@ -187,8 +177,9 @@ const Scores: React.FC = () => {
         .eq('id', scoreId);
 
       if (error) throw error;
+      if (user) invalidateScores(user.id);
       setConfirmDeleteId(null);
-      fetchScores();
+      await fetchScores(true);
     } catch (err: any) {
       setError('Failed to delete score. Please try again.');
     } finally {
@@ -199,14 +190,6 @@ const Scores: React.FC = () => {
   const avgScore = scores.length > 0 
     ? (scores.reduce((acc, s) => acc + s.stableford_points, 0) / scores.length).toFixed(1)
     : '0.0';
-
-  if (loading && subLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[500px]">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    );
-  }
 
   return (
     <div className="relative min-h-screen bg-background pb-20">

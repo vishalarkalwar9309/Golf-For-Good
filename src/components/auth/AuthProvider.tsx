@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import { clearUserCache } from '../../lib/cache';
 import type { User, Profile } from '../../types';
 
 interface AuthContextType {
@@ -138,6 +139,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } finally {
       setUser(null);
       setProfile(null);
+      clearUserCache();
     }
   };
 

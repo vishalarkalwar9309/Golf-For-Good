@@ -1,59 +1,52 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../components/auth/AuthProvider';
 import type { UserSubscription } from '../types';
+import { 
+  fetchUserSubscription, 
+  getCachedUserSubscription, 
+  invalidateSubscription 
+} from '../services/dataService';
 
 export const useSubscription = () => {
   const { user, refreshProfile } = useAuth();
-  const [subscription, setSubscription] = useState<UserSubscription | null>(null);
-  const [loading, setLoading] = useState(true);
+  
+  // Instant cache-first initialization: 0ms perceived load if previously fetched
+  const [subscription, setSubscription] = useState<UserSubscription | null>(() => 
+    user ? getCachedUserSubscription(user.id) : null
+  );
+  const [loading, setLoading] = useState<boolean>(() => 
+    user ? !getCachedUserSubscription(user.id) : false
+  );
   const [error, setError] = useState<string | null>(null);
 
-  const fetchSubscription = async () => {
+  const fetchSubscription = useCallback(async (force = false) => {
     if (!user) {
       setSubscription(null);
       setLoading(false);
       return;
     }
 
-    setLoading(true);
-    let isCancelled = false;
-
-    // Safety timeout: Never hang in loading state longer than 6 seconds
-    const watchdog = setTimeout(() => {
-      if (!isCancelled) {
-        setLoading(false);
-      }
-    }, 6000);
+    // Only set loading true if no cached data is present to prevent layout shift
+    if (!getCachedUserSubscription(user.id) || force) {
+      setLoading(true);
+    }
 
     try {
-      const { data, error: subError } = await supabase
-        .from('subscriptions')
-        .select('*')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (subError) throw subError;
-      if (!isCancelled) {
-        setSubscription(data);
-        setError(null);
-      }
+      const data = await fetchUserSubscription(user.id, force);
+      setSubscription(data);
+      setError(null);
     } catch (err: any) {
       console.error('Error fetching subscription:', err);
-      if (!isCancelled) {
-        setError(err.message);
-      }
+      setError(err.message || 'Failed to load subscription status.');
     } finally {
-      clearTimeout(watchdog);
-      if (!isCancelled) {
-        setLoading(false);
-      }
+      setLoading(false);
     }
-  };
+  }, [user]);
 
   useEffect(() => {
     fetchSubscription();
-  }, [user]);
+  }, [fetchSubscription]);
 
   const createCheckoutSession = async (planType: 'monthly' | 'yearly' = 'monthly') => {
     if (!user) return;
@@ -123,7 +116,8 @@ export const useSubscription = () => {
         .eq('id', subscription.id);
 
       if (updateError) throw updateError;
-      await fetchSubscription();
+      invalidateSubscription(user.id);
+      await fetchSubscription(true);
     } catch (err: any) {
       console.error('Update charity error:', err);
       throw err;
@@ -175,8 +169,9 @@ export const useSubscription = () => {
 
       if (profileError) throw profileError;
 
+      invalidateSubscription(user.id);
       await refreshProfile();
-      await fetchSubscription();
+      await fetchSubscription(true);
     } catch (err: any) {
       console.error('Membership activation error:', err);
       throw err;
@@ -213,8 +208,9 @@ export const useSubscription = () => {
         if (profileError) throw profileError;
       }
 
+      invalidateSubscription(user.id);
       await refreshProfile();
-      await fetchSubscription();
+      await fetchSubscription(true);
     } catch (err: any) {
       console.error('Cancellation error:', err);
       throw err;

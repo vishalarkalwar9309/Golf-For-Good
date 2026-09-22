@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Heart, Globe, Target, ShieldCheck, 
@@ -13,6 +13,11 @@ import { cn, formatCurrency } from '../../lib/utils';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import EmptyState from '../../components/ui/EmptyState';
 import { AbstractGraphic } from '../../components/ui/AbstractGraphic';
+import { 
+  fetchCharities as fetchCharitiesService, 
+  getCachedCharities, 
+  invalidateCharityData 
+} from '../../services/dataService';
 import type { Charity } from '../../types';
 import DonationModal from '../../components/charity/DonationModal';
 
@@ -20,8 +25,10 @@ const CharitySelection: React.FC = () => {
   usePageTitle('My Charity Partner');
   const { user, profile, refreshProfile } = useAuth();
   const { subscription, updateCharityDetails, isPremium, loading: subLoading } = useSubscription();
-  const [charities, setCharities] = useState<Charity[]>([]);
-  const [loading, setLoading] = useState(true);
+  
+  // Instant cache-first initialization
+  const [charities, setCharities] = useState<Charity[]>(() => getCachedCharities() || []);
+  const [loading, setLoading] = useState<boolean>(() => !getCachedCharities());
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
   const [isDonationModalOpen, setIsDonationModalOpen] = useState(false);
@@ -33,42 +40,23 @@ const CharitySelection: React.FC = () => {
   const [contributionPct, setContributionPct] = useState<number>(10);
   const [selectingId, setSelectingId] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchCharities();
-  }, []);
-
-  useEffect(() => {
-    if (subscription) {
-      setSelectedCharityId(subscription.charity_id || null);
-      setContributionPct(subscription.charity_percentage || 10);
-    } else if (profile) {
-      setSelectedCharityId(profile.selected_charity_id || null);
+  const fetchCharities = useCallback(async (force = false) => {
+    if (!getCachedCharities() || force) {
+      setLoading(true);
     }
-  }, [subscription, profile]);
-
-  const fetchCharities = async () => {
-    setLoading(true);
-    let isCancelled = false;
-
-    const watchdog = setTimeout(() => {
-      if (!isCancelled) {
-        setLoading(false);
-      }
-    }, 6000);
-
     try {
-      const { data, error } = await supabase.from('charities').select('*').order('name');
-      if (error) throw error;
-      if (!isCancelled) setCharities(data || []);
+      const data = await fetchCharitiesService(force);
+      setCharities(data);
     } catch (err) {
       console.error('Error fetching charities:', err);
     } finally {
-      clearTimeout(watchdog);
-      if (!isCancelled) {
-        setLoading(false);
-      }
+      setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchCharities();
+  }, [fetchCharities]);
 
   const handleSelectCharity = async (charityId: string) => {
     if (!user) return;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Trophy, Calendar, Award, Lock, ArrowRight, CheckCircle2, Sparkles } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Link } from 'react-router-dom';
@@ -9,54 +9,47 @@ import { cn, formatCurrency, formatDate } from '../../lib/utils';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import EmptyState from '../../components/ui/EmptyState';
 import { AbstractGraphic } from '../../components/ui/AbstractGraphic';
+import { fetchWithCache, getCached } from '../../lib/cache';
 import type { Draw } from '../../types';
 
 const DrawsHistory: React.FC = () => {
   usePageTitle('Monthly Draws');
   const { user } = useAuth();
   const { isActive, isPremium, loading: subLoading } = useSubscription();
-  const [draws, setDraws] = useState<Draw[]>([]);
-  const [loading, setLoading] = useState(true);
+  
+  // Instant cache-first initialization
+  const [draws, setDraws] = useState<Draw[]>(() => getCached<Draw[]>('public:all_draws') || []);
+  const [loading, setLoading] = useState<boolean>(() => !getCached<Draw[]>('public:all_draws'));
 
-  useEffect(() => {
-    fetchDraws();
-  }, []);
-
-  const fetchDraws = async () => {
-    setLoading(true);
-    let isCancelled = false;
-
-    const watchdog = setTimeout(() => {
-      if (!isCancelled) {
-        setLoading(false);
-      }
-    }, 6000);
-
+  const fetchDraws = useCallback(async (force = false) => {
+    if (!getCached('public:all_draws') || force) {
+      setLoading(true);
+    }
     try {
-      const { data, error } = await supabase
-        .from('draws')
-        .select('*')
-        .order('created_at', { ascending: false });
+      const data = await fetchWithCache<Draw[]>(
+        'public:all_draws',
+        async () => {
+          const { data: drawsData, error } = await supabase
+            .from('draws')
+            .select('*')
+            .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      if (!isCancelled) setDraws(data || []);
+          if (error) throw error;
+          return drawsData || [];
+        },
+        { ttl: 120000, forceRefresh: force }
+      );
+      setDraws(data);
     } catch (err) {
       console.error('Error fetching draws:', err);
     } finally {
-      clearTimeout(watchdog);
-      if (!isCancelled) {
-        setLoading(false);
-      }
+      setLoading(false);
     }
-  };
+  }, []);
 
-  if (loading && subLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[500px]">
-        <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
+  useEffect(() => {
+    fetchDraws();
+  }, [fetchDraws]);
 
   const isWinner = (draw: Draw) => {
     return draw.winners?.some((w: any) => w.user_id === user?.id) || false;

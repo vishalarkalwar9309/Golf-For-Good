@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { 
@@ -14,18 +14,33 @@ import { cn, formatCurrency, formatDate } from '../../lib/utils';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import EmptyState from '../../components/ui/EmptyState';
 import { AbstractGraphic } from '../../components/ui/AbstractGraphic';
+import { 
+  fetchUserScores, 
+  getCachedUserScores, 
+  fetchCharities, 
+  getCachedCharities,
+  fetchLatestPublishedDraw, 
+  getCachedLatestDraw,
+  fetchUserDrawEntry,
+  invalidateScores 
+} from '../../services/dataService';
 import type { Score, Charity } from '../../types';
 
 const DashboardOverview: React.FC = () => {
   const { user, profile } = useAuth();
   const { subscription, isActive, isPremium, loading: subLoading } = useSubscription();
   usePageTitle('Member Dashboard');
-  const [scores, setScores] = useState<Score[]>([]);
-  const [charities, setCharities] = useState<Charity[]>([]);
-  const [latestDraw, setLatestDraw] = useState<any>(null);
+  
+  // Instant cache-first initialization: 0ms perceived load time
+  const [scores, setScores] = useState<Score[]>(() => user ? (getCachedUserScores(user.id) || []) : []);
+  const [charities, setCharities] = useState<Charity[]>(() => getCachedCharities() || []);
+  const [latestDraw, setLatestDraw] = useState<any>(() => getCachedLatestDraw());
   const [latestEntry, setLatestEntry] = useState<any>(null);
-  const [featuredCharities, setFeaturedCharities] = useState<Charity[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [featuredCharities, setFeaturedCharities] = useState<Charity[]>(() => {
+    const all = getCachedCharities() || [];
+    return all.filter(c => c.featured).slice(0, 3);
+  });
+  const [loadingScores, setLoadingScores] = useState<boolean>(() => !user || !getCachedUserScores(user.id));
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
@@ -36,78 +51,43 @@ const DashboardOverview: React.FC = () => {
     date: new Date().toISOString().split('T')[0] 
   });
 
-  useEffect(() => {
-    if (user) {
-      fetchData();
+  const fetchData = useCallback(async (force = false) => {
+    if (!user) return;
+    
+    // Only show score skeleton if we have no cached data
+    if (!getCachedUserScores(user.id) || force) {
+      setLoadingScores(true);
     }
-  }, [user]);
-
-  const fetchData = async () => {
-    setLoading(true);
-    let isCancelled = false;
-
-    const watchdog = setTimeout(() => {
-      if (!isCancelled) {
-        setLoading(false);
-      }
-    }, 6000);
 
     try {
-      // 1. Fetch scores
-      const { data: scoreData } = await supabase
-        .from('scores')
-        .select('*')
-        .eq('user_id', user?.id)
-        .order('date', { ascending: false })
-        .limit(5);
-      
-      if (!isCancelled) setScores(scoreData || []);
+      // Parallel requests via cached dataService
+      const [scoresData, charitiesData, drawData] = await Promise.all([
+        fetchUserScores(user.id, force),
+        fetchCharities(force),
+        fetchLatestPublishedDraw(force)
+      ]);
 
-      // 2. Fetch charities
-      const { data: charityData } = await supabase
-        .from('charities')
-        .select('*');
-      
-      if (!isCancelled) setCharities(charityData || []);
+      setScores(scoresData);
+      setCharities(charitiesData);
+      setLatestDraw(drawData);
 
-      // 3. Fetch latest published draw
-      const { data: drawData } = await supabase
-        .from('draws')
-        .select('*')
-        .eq('status', 'published')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      
-      if (!isCancelled) setLatestDraw(drawData);
+      const featured = charitiesData.filter(c => c.featured);
+      setFeaturedCharities(featured.length > 0 ? featured.slice(0, 3) : charitiesData.slice(0, 3));
 
-      // 4. Fetch user's entry for this draw
-      if (drawData && user?.id) {
-        const { data: entryData } = await supabase
-          .from('draw_entries')
-          .select('*')
-          .eq('draw_id', drawData.id)
-          .eq('user_id', user.id)
-          .maybeSingle();
-        if (!isCancelled) setLatestEntry(entryData);
+      if (drawData && user.id) {
+        const entryData = await fetchUserDrawEntry(user.id, drawData.id, force);
+        setLatestEntry(entryData);
       }
-
-      // 5. Fetch featured charities for discovery
-      const { data: featuredData } = await supabase
-        .from('charities')
-        .select('*')
-        .eq('featured', true)
-        .limit(3);
-      if (!isCancelled) setFeaturedCharities(featuredData || []);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
     } finally {
-      clearTimeout(watchdog);
-      if (!isCancelled) {
-        setLoading(false);
-      }
+      setLoadingScores(false);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const handleScoreSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -175,9 +155,10 @@ const DashboardOverview: React.FC = () => {
 
       if (error) throw error;
 
+      invalidateScores(user.id);
       setMessage({ type: 'success', text: 'Round recorded! Your draw entry numbers have been updated.' });
       setNewScore({ points: '', course: '', date: new Date().toISOString().split('T')[0] });
-      fetchData();
+      await fetchData(true);
     } catch (err: any) {
       setMessage({ type: 'error', text: err.message || 'Failed to record score.' });
     } finally {
@@ -186,15 +167,6 @@ const DashboardOverview: React.FC = () => {
   };
 
   const activeCharity = charities.find(c => c.id === (subscription?.charity_id || profile?.selected_charity_id));
-
-  if (loading && subLoading) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-background text-primary gap-4">
-        <div className="w-10 h-10 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
-        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Loading your Golf For Good...</p>
-      </div>
-    );
-  }
 
   const membershipPlanLabel = subscription?.plan_type === 'yearly'
     ? 'Annual Member'
@@ -362,7 +334,20 @@ const DashboardOverview: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Score List */}
               <div className="space-y-3">
-                {scores.length > 0 ? (
+                {loadingScores && scores.length === 0 ? (
+                  Array.from({ length: 3 }).map((_, idx) => (
+                    <div key={idx} className="bg-surface-container border border-white/10 rounded-2xl p-4 flex items-center justify-between animate-pulse">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-xl bg-white/[0.06]" />
+                        <div className="space-y-2">
+                          <div className="h-4 w-32 bg-white/[0.06] rounded" />
+                          <div className="h-3 w-20 bg-white/[0.06] rounded" />
+                        </div>
+                      </div>
+                      <div className="h-3 w-8 bg-white/[0.06] rounded" />
+                    </div>
+                  ))
+                ) : scores.length > 0 ? (
                   scores.map((score, i) => (
                     <motion.div 
                       key={score.id}
