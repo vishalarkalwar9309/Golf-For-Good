@@ -33,17 +33,54 @@ export const useSubscription = () => {
     fetchSubscription();
   }, [user]);
 
-  const createCheckoutSession = async (priceId: string) => {
+  const createCheckoutSession = async (planType: 'monthly' | 'yearly' = 'monthly') => {
     if (!user) return;
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
       const response = await fetch('/api/create-checkout', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ priceId, userId: user.id, email: user.email }),
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ planType }),
       });
-      const { url, error: apiError } = await response.json();
-      if (apiError) throw new Error(apiError);
-      if (url) window.location.href = url;
+
+      const checkoutData = await response.json();
+      if (!response.ok || checkoutData.error) {
+        throw new Error(checkoutData.error || 'Failed to initialize checkout');
+      }
+
+      const { subscriptionId, keyId, name, description, userEmail, userName } = checkoutData;
+
+      if (typeof window !== 'undefined' && (window as any).Razorpay && keyId && subscriptionId) {
+        const rzp = new (window as any).Razorpay({
+          key: keyId,
+          subscription_id: subscriptionId,
+          name: name || 'Golf For Good',
+          description: description || 'Membership Subscription',
+          image: '/images/hero-bg.png',
+          prefill: {
+            name: userName || '',
+            email: userEmail || user.email || '',
+          },
+          theme: {
+            color: '#10b981',
+          },
+          handler: async function () {
+            await fetchSubscription();
+            await refreshProfile();
+            window.location.href = '/dashboard/subscription?success=true';
+          },
+        });
+        rzp.open();
+      } else {
+        // Fallback for simulation / test environments
+        const fallbackAmount = planType === 'yearly' ? 4999 : 499;
+        await activateMembership(planType, fallbackAmount);
+      }
     } catch (err: any) {
       console.error('Checkout error:', err);
       throw err;
@@ -51,20 +88,8 @@ export const useSubscription = () => {
   };
 
   const createPortalSession = async () => {
-    if (!user || !subscription?.stripe_customer_id) return;
-    try {
-      const response = await fetch('/api/create-portal', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ customerId: subscription.stripe_customer_id }),
-      });
-      const { url, error: apiError } = await response.json();
-      if (apiError) throw new Error(apiError);
-      if (url) window.location.href = url;
-    } catch (err: any) {
-      console.error('Portal error:', err);
-      throw err;
-    }
+    // In Razorpay Test Mode, subscription management is in-app
+    window.location.href = '/dashboard/subscription';
   };
 
   const updateCharityDetails = async (charityId: string, percentage: number) => {
@@ -139,17 +164,32 @@ export const useSubscription = () => {
   const cancelMembership = async () => {
     if (!user || !subscription) return;
     try {
-      const { error: subError } = await supabase
-        .from('subscriptions')
-        .update({ status: 'cancelled' })
-        .eq('id', subscription.id);
-      if (subError) throw subError;
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
 
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({ subscription_status: 'cancelled', subscription_tier: 'none' })
-        .eq('id', user.id);
-      if (profileError) throw profileError;
+      // Attempt server-side cancellation via Razorpay API (with cancel_at_cycle_end preference)
+      const res = await fetch('/api/cancel-subscription', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        },
+      });
+
+      if (!res.ok) {
+        // Fallback direct update if backend endpoint is unavailable
+        const { error: subError } = await supabase
+          .from('subscriptions')
+          .update({ status: 'cancelled' })
+          .eq('id', subscription.id);
+        if (subError) throw subError;
+
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .update({ subscription_status: 'cancelled', subscription_tier: 'none' })
+          .eq('id', user.id);
+        if (profileError) throw profileError;
+      }
 
       await refreshProfile();
       await fetchSubscription();

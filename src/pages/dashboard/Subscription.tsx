@@ -40,17 +40,18 @@ const Subscription: React.FC = () => {
 
   const handleActivate = async () => {
     if (!selectedPlan) return;
-    await activateMembership(selectedPlan.type, selectedPlan.price);
+    try {
+      await createCheckoutSession(selectedPlan.type);
+      setSelectedPlan(null);
+    } catch (err) {
+      console.error('Activation failed:', err);
+    }
   };
 
   const handleManage = async () => {
     setProcessing('portal');
     try {
-      if (subscription?.stripe_customer_id) {
-        await createPortalSession();
-      } else {
-        alert('Stripe customer portal is available when configured with a live Stripe account. Membership is currently active in development simulation.');
-      }
+      await createPortalSession();
     } catch (err) {
       console.error(err);
     } finally {
@@ -234,16 +235,16 @@ const Subscription: React.FC = () => {
                       Lock in a full year of draw entries and save annually on your membership dues.
                     </p>
                     <button
-                      onClick={() => setSelectedPlan({ type: 'yearly', price: currentAmount ? currentAmount * 10 : 250 })}
+                      onClick={() => setSelectedPlan({ type: 'yearly', price: 4999 })}
                       className="px-6 py-2.5 rounded-xl bg-secondary text-secondary-foreground font-semibold text-xs hover:opacity-90 transition-opacity shadow-md"
                     >
-                      Switch to Annual Plan
+                      Switch to Annual Plan (₹4,999/yr)
                     </button>
                   </div>
                 )}
               </div>
             ) : (
-              /* Plans Selection Cards without hardcoded prices */
+              /* Plans Selection Cards with fixed demo pricing */
               <div className="space-y-6">
                 <div>
                   <h2 className="text-2xl font-display font-bold text-foreground">
@@ -260,7 +261,9 @@ const Subscription: React.FC = () => {
                       type: 'monthly' as const,
                       name: 'Monthly Membership',
                       badge: 'Monthly Draw Entry',
-                      priceAmount: 25,
+                      priceAmount: 499,
+                      priceDisplay: '₹499',
+                      periodDisplay: '/ month',
                       icon: Zap,
                       desc: 'Flexible monthly participation with full eligibility in all prize tiers.',
                       features: ['Monthly cash draw entry', '10%+ to your chosen charity', 'Full scoring dashboard', 'Cancel anytime']
@@ -269,7 +272,9 @@ const Subscription: React.FC = () => {
                       type: 'yearly' as const,
                       name: 'Annual Membership',
                       badge: 'Best Value',
-                      priceAmount: 250,
+                      priceAmount: 4999,
+                      priceDisplay: '₹4,999',
+                      periodDisplay: '/ year',
                       icon: Star,
                       desc: 'Year-round participation with maximum impact and annual billing savings.',
                       features: ['All 12 monthly draws', 'Continuous charity impact', 'Priority verification', 'Discounted annual rate']
@@ -290,9 +295,15 @@ const Subscription: React.FC = () => {
                           </div>
                         </div>
 
-                        <h3 className="font-display font-bold text-xl text-foreground mb-2">
+                        <h3 className="font-display font-bold text-xl text-foreground mb-1">
                           {p.name}
                         </h3>
+
+                        <div className="flex items-baseline gap-1 mb-3">
+                          <span className="text-2xl font-display font-extrabold text-foreground">{p.priceDisplay}</span>
+                          <span className="text-xs text-muted-foreground font-medium">{p.periodDisplay}</span>
+                        </div>
+
                         <p className="text-xs text-muted-foreground leading-relaxed mb-6">
                           {p.desc}
                         </p>

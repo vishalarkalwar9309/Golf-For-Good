@@ -88,8 +88,8 @@ const Onboarding: React.FC = () => {
         .maybeSingle();
 
       const renewalDays = plan === 'monthly' ? 30 : (plan === 'yearly' ? 365 : 10000);
-      // Preserve existing configured amount if present, or use standard plan values
-      const configuredAmount = existingSub?.amount ?? (plan === 'free' ? 0 : (plan === 'monthly' ? 25 : 250));
+      // Fixed demo plan pricing: ₹499/mo and ₹4,999/yr
+      const configuredAmount = existingSub?.amount ?? (plan === 'free' ? 0 : (plan === 'monthly' ? 499 : 4999));
 
       const subData = {
         user_id: user.id,
@@ -430,6 +430,7 @@ const Onboarding: React.FC = () => {
                       id: 'monthly',
                       title: 'Monthly Plan',
                       badge: 'Monthly Draw Entry',
+                      priceDisplay: '₹499 / month',
                       description: 'Full participation in monthly cash draws and charitable giving.',
                       features: [
                         'Automatic monthly draw entry',
@@ -443,6 +444,7 @@ const Onboarding: React.FC = () => {
                       id: 'yearly',
                       title: 'Annual Plan',
                       badge: 'Best Value',
+                      priceDisplay: '₹4,999 / year',
                       description: 'Year-round participation with maximum contribution efficiency.',
                       features: [
                         'All monthly draw entries',
@@ -479,9 +481,12 @@ const Onboarding: React.FC = () => {
                             {isSelected && <CheckCircle2 className="w-5 h-5 text-primary" />}
                           </div>
 
-                          <h3 className="font-display font-bold text-xl text-foreground mb-2">
+                          <h3 className="font-display font-bold text-xl text-foreground mb-1">
                             {p.title}
                           </h3>
+                          <p className="text-sm font-semibold text-primary mb-2">
+                            {p.priceDisplay}
+                          </p>
                           <p className="text-xs text-muted-foreground leading-relaxed mb-6">
                             {p.description}
                           </p>

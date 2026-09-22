@@ -28,10 +28,9 @@ const CheckoutConfirmation: React.FC<CheckoutConfirmationProps> = ({
     setStatus('processing');
     setError(null);
     try {
-      // Add a small artificial delay for "premium processing" feel
-      await new Promise(resolve => setTimeout(resolve, 2000));
       await onConfirm();
-      setStatus('success');
+      setStatus('idle');
+      onClose();
     } catch (err: any) {
       setError(err.message || 'Activation failed. Please try again.');
       setStatus('idle');

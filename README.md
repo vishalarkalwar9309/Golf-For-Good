@@ -146,7 +146,7 @@ Role assignment is stored in the `profiles` table. Route protection is enforced 
 | Charts         | Recharts                                        |
 | Icons          | Lucide React                                    |
 | Backend/DB     | Supabase (PostgreSQL + Auth + Storage + RLS)    |
-| Payments       | Stripe (Checkout, Billing Portal, Webhooks)     |
+| Payments       | Razorpay Test Mode (Subscriptions & Webhooks)   |
 | API Routes     | Vercel Serverless Functions (Node.js runtime)   |
 | Deployment     | Vercel                                          |
 
@@ -156,43 +156,46 @@ Role assignment is stored in the `profiles` table. Route protection is enforced 
 
 ```
 golf-for-good/
-├── api/                        # Vercel serverless API routes
-├── public/                     # Static assets
+├── api/                        # Vercel serverless API routes (Checkout, Webhook, Cancellation)
+├── public/                     # Static assets & brand graphics
+├── scripts/                    # Diagnostic & PRD verification test suites
 ├── src/
 │   ├── components/
-│   │   ├── admin/              # Admin-specific UI components
-│   │   ├── auth/               # AuthProvider, ProtectedRoute logic
-│   │   ├── charity/            # Charity cards, detail UI
-│   │   ├── layout/             # Navbar, Footer
-│   │   ├── subscription/       # Plan selection, status indicators
-│   │   └── ui/                 # Shared primitives (badges, modals, etc.)
-│   ├── hooks/                  # Custom React hooks
+│   │   ├── admin/              # Admin-specific management modals & tables
+│   │   ├── auth/               # AuthProvider, role & subscription route guards
+│   │   ├── charity/            # Charity cards, spotlight, and donation modals
+│   │   ├── home/               # Interactive score story & educational calculator
+│   │   ├── layout/             # Responsive Navbar, UserSidebar, AdminSidebar, Footer
+│   │   ├── subscription/       # Plan selection & checkout confirmation modals
+│   │   └── ui/                 # Shared design system (StatCards, Badges, ProofUpload)
+│   ├── hooks/                  # Custom React hooks (useSubscription, usePageTitle)
 │   ├── lib/
-│   │   ├── supabase.ts         # Supabase client initialisation
-│   │   ├── draw.ts             # Draw algorithm and matching logic
-│   │   ├── slugs.ts            # Charity slug utilities
-│   │   └── utils.ts            # Shared utility functions
+│   │   ├── supabase.ts         # Resilient Supabase client with graceful fallbacks
+│   │   ├── draw.ts             # PRD-compliant draw engine & matching algorithm
+│   │   ├── slugs.ts            # URL slug generation & sanitization
+│   │   └── utils.ts            # Formatting (INR currency, dates, percentages)
 │   ├── pages/
 │   │   ├── admin/              # AdminLayout, Overview, Users, Charities, Draws, Winners, Subscriptions, Analytics
 │   │   ├── dashboard/          # DashboardLayout, Overview, Scores, Charity, Draws, Winnings, Subscription, Profile
-│   │   ├── Home.tsx
-│   │   ├── Charities.tsx
-│   │   ├── CharityDetail.tsx
-│   │   ├── HowItWorks.tsx
-│   │   ├── Leaderboard.tsx
-│   │   ├── Login.tsx
-│   │   ├── Signup.tsx
-│   │   └── Onboarding.tsx
+│   │   ├── Home.tsx            # Public landing with Play -> Win -> Give Back storytelling
+│   │   ├── Charities.tsx       # Searchable directory with category filters
+│   │   ├── CharityDetail.tsx   # Charity impact metrics & direct donation support
+│   │   ├── HowItWorks.tsx      # Draw rules, prize pool splits, and FAQ
+│   │   ├── Leaderboard.tsx     # Platform-wide score rankings
+│   │   ├── Login.tsx           # Authentication with session recovery
+│   │   ├── Signup.tsx          # Member registration
+│   │   └── Onboarding.tsx      # 3-step wizard (handicap, charity selection, plan tier)
 │   ├── types/                  # Shared TypeScript interfaces and enums
-│   ├── App.tsx                 # Root router, route guards
+│   ├── App.tsx                 # Root application routing and route guards
 │   └── main.tsx
 ├── .env.example
+├── setup_production_schema.sql # Unified, idempotent production database schema
 ├── vercel.json
 ├── vite.config.ts
 └── package.json
 ```
 
-The client/server boundary is clean: all Supabase queries run from the client using the typed JS SDK, with RLS policies enforcing data access rules at the database layer. Serverless functions in `api/` handle Stripe Checkout session creation, Customer Portal access, and webhook processing — operations that require secret keys and must never run client-side.
+The client/server boundary is strict: all browser queries run via the typed Supabase JS SDK, with access control enforced at the PostgreSQL engine level through Row Level Security (RLS). Serverless functions in `api/` handle payment subscription creation, webhook event verification, and membership cancellations — operations requiring server-side secrets that are never exposed to the client.
 
 ---
 
@@ -200,38 +203,16 @@ The client/server boundary is clean: all Supabase queries run from the client us
 
 | Table            | Purpose                                                                 |
 |------------------|-------------------------------------------------------------------------|
-| `profiles`       | Extended user record. Stores display name, handicap, role (`user`/`admin`), charity selection, onboarding status. |
-| `subscriptions`  | Tracks plan type (`monthly`/`yearly`), status, start/end dates, and renewal history per user. |
-| `scores`         | Stores Stableford scores per user with timestamps. Only the 5 most recent scores per user are considered active. |
-| `charities`      | Charity registry with name, description, category, logo, featured flag, and slug. |
-| `draws`          | Monthly draw records: draw numbers, prize pool, status (`draft`/`published`/`archived`), jackpot carry-over flag. |
-| `draw_entries`   | Per-user draw participation records: matched numbers, match tier, prize allocated. |
-| `winner_proofs`  | Proof submission records: file URL, submission timestamp, admin review status, notes. |
-| `donations`      | Independent one-off donation records: amount, charity, user (nullable for anonymous), timestamp. |
+| `profiles`       | Extended user profile (display name, handicap, role, charity selection, onboarding state). |
+| `subscriptions`  | Membership records (plan tier, status, start/end dates, renewal dates). |
+| `scores`         | Stableford scores (1–45 range constraint, unique date constraint per user, latest-5 retention). |
+| `charities`      | Charity directory with category, description, featured status, and metrics. |
+| `draws`          | Monthly draw cycles (winning numbers, prize pool, jackpot rollover, status). |
+| `draw_entries`   | User draw entries per cycle (matched count, tier allocation, prize amount). |
+| `winner_proofs`  | Winner verification records with uploaded scorecards/handicap certificates. |
+| `donations`      | Independent donation records linked to chosen charities. |
 
-All tables are protected by Supabase Row Level Security. Users can only read and write their own records; admin-scoped operations are handled via service-role policies or explicit admin checks.
-
----
-
-## Key Business Logic
-
-### Latest-5 Score Retention
-Each user's draw eligibility is determined by their most recent 5 Stableford scores. When a new score is submitted, the system retrieves the user's score count. If it exceeds 5, the oldest record is superseded. This ensures the draw engine always operates on current form, not historical averages.
-
-### Subscription Gating
-Score submission and draw participation are gated behind an active subscription. The `AuthProvider` exposes subscription state throughout the app. UI components conditionally render based on subscription status; server-side queries enforce the same constraint via RLS, ensuring access cannot be bypassed client-side.
-
-### Draw Matching System
-At draw time, each subscriber's 5 active scores are compared against the 5 published draw numbers. The system counts the number of matching values. Match counts of 5, 4, and 3 qualify for prize tiers. The matching algorithm runs in `src/lib/draw.ts` and is deterministic — the same inputs always produce the same outcome.
-
-### Prize Pool Split
-The prize pool for a given draw cycle is divided across tiers in fixed proportions. If no winner exists for a particular tier (e.g., no 5-match), that tier's allocation is flagged for rollover rather than redistribution downward. This preserves jackpot integrity across cycles.
-
-### Jackpot Rollover
-If the top prize tier (5-match) goes unclaimed in a draw cycle, the jackpot amount carries forward and accumulates to the next cycle's top prize. This is tracked via a `jackpot_rollover` field on the `draws` table and applied during prize pool calculation for the subsequent draw.
-
-### Winner Verification Lifecycle
-Winners are not marked as paid immediately upon draw resolution. The flow requires proof submission (`pending`), admin review (`approved`/`rejected`), and an explicit payout action (`paid`). This lifecycle prevents fraud, provides an audit trail, and gives admins control over disbursement timing. All state transitions are timestamped.
+All tables enforce Row Level Security. Users can read and write only their own records; admin operations are guarded by the `is_admin()` security definer function or server-side service-role execution.
 
 ---
 
@@ -239,8 +220,8 @@ Winners are not marked as paid immediately upon draw resolution. The flow requir
 
 ### Prerequisites
 - Node.js 18+
-- A Supabase project (free tier is sufficient)
-- Vercel account (for deployment)
+- A Supabase project (PostgreSQL + Auth + Storage)
+- Razorpay account (Test Mode)
 
 ### 1. Clone the Repository
 
@@ -257,65 +238,61 @@ npm install
 
 ### 3. Configure Environment Variables
 
-Copy the example file and fill in your Supabase credentials:
+Copy `.env.example` to `.env.local`:
 
 ```bash
 cp .env.example .env.local
 ```
 
+Populate the variables in `.env.local` (kept strictly local and git-ignored).
+
 ### 4. Set Up the Database
 
-Run the provided SQL migration scripts against your Supabase project in order via the Supabase SQL editor:
+Execute `setup_production_schema.sql` in your Supabase SQL Editor. This script is fully idempotent and provisions:
+- All 8 required tables with foreign key relationships
+- Row Level Security (RLS) policies for users, subscribers, and administrators
+- Constraints: Stableford points range (1–45) and unique round dates per player
+- Triggers: Automatic profile creation on signup and 5-score FIFO retention pruning
+- Seed data: 6 default UK charity partners
 
-```
-1. setup_subscriptions.sql
-2. setup_charities.sql
-3. setup_draw_engine.sql
-4. setup_winner_lifecycle.sql
-5. setup_donations.sql
-6. fix_admin_policies.sql
-7. fix_leaderboard_rls.sql
-```
+### 5. Verify Database Integration
 
-Steps 6 and 7 patch RLS policies and must be applied after the primary migrations.
-
-### 5. Seed Initial Data (Optional)
+Run the automated integration audit to confirm remote database status:
 
 ```bash
-# Run in Supabase SQL editor
-seed_leaderboard.sql
-setup_charities.sql
+npx tsx scripts/verify-supabase-integration.ts
 ```
 
 ### 6. Create an Admin User
 
-Sign up a regular account through the app, then promote it to admin by running:
+Register a standard user account in the app, then elevate the account role to `admin` via the Supabase SQL Editor:
 
-```bash
-npx tsx promote-admin.ts
+```sql
+UPDATE profiles SET role = 'admin' WHERE email = 'your-admin-email@example.com';
 ```
-
-The script targets the email hardcoded in `promote-admin.ts`. Update that value before running if needed.
 
 ---
 
 ## Environment Variables
 
-**Client-side** (prefix with `VITE_`, safe to expose via Vite):
+**Client-side** (prefixed with `VITE_`, embedded in client bundle):
 
 | Variable                 | Description                                    |
 |--------------------------|------------------------------------------------|
-| `VITE_SUPABASE_URL`      | Your Supabase project URL                      |
-| `VITE_SUPABASE_ANON_KEY` | Your Supabase anonymous/public key             |
+| `VITE_SUPABASE_URL`      | Supabase project REST endpoint URL             |
+| `VITE_SUPABASE_ANON_KEY` | Supabase public anonymous API key              |
 
-**Server-side only** (set in Vercel dashboard, never in `.env.local` or client bundles):
+**Server-side only** (configured in Vercel or local `.env.local`, never exposed to browser):
 
-| Variable                    | Description                                         |
-|-----------------------------|-----------------------------------------------------|
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key — used by webhook handler |
-| `STRIPE_SECRET_KEY`         | Stripe secret key — used by Checkout and Portal API |
-| `STRIPE_WEBHOOK_SECRET`     | Stripe webhook signing secret — validates events    |
-| `NEXT_PUBLIC_SITE_URL`      | Your deployed site URL (used for Stripe redirects)  |
+| Variable                    | Description                                              |
+|-----------------------------|----------------------------------------------------------|
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service-role secret key (bypasses RLS server-side) |
+| `RAZORPAY_KEY_ID`           | Razorpay Test Mode Key ID (`rzp_test_...`)               |
+| `RAZORPAY_KEY_SECRET`       | Razorpay Test Mode Secret Key                            |
+| `RAZORPAY_WEBHOOK_SECRET`   | Secret string for verifying HMAC-SHA256 webhook signatures|
+| `RAZORPAY_PLAN_MONTHLY`     | Razorpay Monthly Subscription Plan ID (`plan_...`)       |
+| `RAZORPAY_PLAN_YEARLY`      | Razorpay Yearly Subscription Plan ID (`plan_...`)        |
+| `NEXT_PUBLIC_SITE_URL`      | Base application URL for return redirects                |
 
 ---
 
@@ -332,6 +309,26 @@ To run a production build locally:
 ```bash
 npm run build
 npm run preview
+```
+
+---
+
+## Testing & Verification
+
+The platform includes comprehensive automated test suites covering PRD business logic, mathematical prize splits, security constraints, and live database connectivity:
+
+```bash
+# Typecheck validation (zero errors)
+npm run lint
+
+# Production bundle compilation
+npm run build
+
+# End-to-end PRD automated verification suite (15 checks: constraints, draw engine, 40/35/25 splits, rollover)
+npx tsx scripts/e2e-verify.ts
+
+# Live Supabase integration audit (21 checks: tables, seeds, storage bucket, RLS)
+npx tsx scripts/verify-supabase-integration.ts
 ```
 
 ---
@@ -370,7 +367,7 @@ Or connect your GitHub repository to Vercel for automatic CI/CD on push to `main
 
 The following enhancements represent logical next iterations for the platform:
 
-- **Live Stripe Activation** — The Stripe integration is scaffolded (Checkout, Portal, Webhooks). Connecting live Stripe Price IDs and a verified Stripe account would make subscriptions fully transactional.
+- **Live Payment Activation** — The Razorpay Subscriptions and Webhook adapter is implemented and verified in Test Mode (supporting INR ₹499/mo and ₹4,999/yr). Moving to live production requires switching to production Razorpay API keys and webhook secret.
 - **Email Notifications** — Transactional emails for draw results, winner confirmations, and subscription renewals via Resend or SendGrid.
 - **Campaign Module** — Time-limited charity campaigns with dedicated landing pages, fundraising targets, and progress tracking.
 - **Mobile Application** — A React Native companion app for score submission on the course and draw result push notifications.
