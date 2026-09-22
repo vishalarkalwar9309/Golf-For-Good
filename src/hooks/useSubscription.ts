@@ -105,50 +105,39 @@ export const useSubscription = () => {
       );
     }
 
-    return new Promise<void>((resolve, reject) => {
-      try {
-        const rzp = new (window as any).Razorpay({
-          key: keyId,
-          subscription_id: subscriptionId,
-          name: name || 'Golf For Good',
-          description: description || 'Membership Subscription',
-          image: '/images/hero-bg.png',
-          prefill: {
-            name: userName || '',
-            email: userEmail || user.email || '',
-          },
-          theme: {
-            color: '#10b981',
-          },
-          modal: {
-            ondismiss: function () {
-              const cancelErr = new Error('Activation was cancelled');
-              cancelErr.name = 'CancelError';
-              reject(cancelErr);
-            },
-          },
-          handler: async function () {
-            try {
-              invalidateSubscription(user.id);
-              await fetchSubscription(true);
-              await refreshProfile();
-            } catch (refreshErr) {
-              console.warn('Subscription post-payment refresh warning:', refreshErr);
-            }
-            resolve();
-          },
-        });
-
-        rzp.on('payment.failed', function (resp: any) {
-          const msg = resp?.error?.description || 'Payment could not be completed';
-          reject(new Error(msg));
-        });
-
-        rzp.open();
-      } catch (err: any) {
-        reject(new Error(err?.message || 'Failed to initialize payment gateway'));
-      }
+    const rzp = new (window as any).Razorpay({
+      key: keyId,
+      subscription_id: subscriptionId,
+      name: name || 'Golf For Good',
+      description: description || 'Membership Subscription',
+      prefill: {
+        name: userName || '',
+        email: userEmail || user.email || '',
+      },
+      theme: {
+        color: '#10b981',
+      },
+      handler: async function () {
+        try {
+          invalidateSubscription(user.id);
+          await fetchSubscription(true);
+          await refreshProfile();
+        } catch (refreshErr) {
+          console.warn('Subscription post-payment refresh warning:', refreshErr);
+        }
+        window.location.href = '/dashboard/subscription?success=true';
+      },
     });
+
+    rzp.on('payment.failed', function (resp: any) {
+      console.error('Payment failed:', resp?.error?.description);
+    });
+
+    try {
+      rzp.open();
+    } catch (openErr: any) {
+      throw new Error(openErr?.message || 'Failed to open Razorpay checkout modal.');
+    }
   };
 
   const createPortalSession = async () => {

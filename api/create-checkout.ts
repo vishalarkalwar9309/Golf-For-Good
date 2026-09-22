@@ -58,7 +58,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 6000);
+  const timeoutId = setTimeout(() => controller.abort(), 5000);
 
   try {
     const authString = Buffer.from(`${keyId}:${keySecret}`).toString('base64');
@@ -104,10 +104,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
   } catch (err: any) {
     if (err.name === 'AbortError') {
-      return res.status(504).json({ error: 'Payment gateway request timed out. Please try again.' });
+      return res.status(504).json({ error: 'Payment provider unavailable' });
     }
     console.error('Checkout initialization error:', err);
-    return res.status(500).json({ error: err.message || 'Internal server error' });
+    return res.status(500).json({ error: err.message || 'Payment provider unavailable' });
   } finally {
     clearTimeout(timeoutId);
   }

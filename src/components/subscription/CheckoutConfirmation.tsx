@@ -56,7 +56,8 @@ const CheckoutConfirmation: React.FC<CheckoutConfirmationProps> = ({
     try {
       await onConfirm();
       if (watchdogRef.current) clearTimeout(watchdogRef.current);
-      setStatus('success');
+      setStatus('idle');
+      onClose();
     } catch (err: any) {
       if (watchdogRef.current) clearTimeout(watchdogRef.current);
       const isTimeout =
